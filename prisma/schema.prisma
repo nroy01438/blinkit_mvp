@@ -1,0 +1,173 @@
+// Aur Kuch? — Blinkit clone with household-graph AI feature
+// Prisma schema targeting Postgres (Vercel Postgres / Neon in prod, local `prisma dev` server for dev)
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- Catalog (shared, global) ----------
+
+model Product {
+  id           String   @id @default(cuid())
+  sku          String   @unique
+  name         String
+  brand        String
+  category     String
+  subcategory  String
+  price        Int // rupees
+  mrp          Int // rupees
+  packSize     String
+  deliveryMins Int      @default(8)
+  trialPack    Boolean  @default(false)
+  emoji        String
+  colorFrom    String
+  colorTo      String
+  available    Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  orderItems OrderItem[]
+  cartItems  CartItem[]
+
+  @@index([category, subcategory])
+}
+
+// ---------- Session / persona instance ----------
+
+model Session {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @updatedAt
+
+  personas SessionPersona[]
+}
+
+model SessionPersona {
+  id         String   @id @default(cuid())
+  sessionId  String
+  session    Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  personaKey String // priya | rohit | ananya | vikram
+  simDay     Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  orders       Order[]
+  cartItems    CartItem[]
+  attributes   GraphAttribute[]
+  events       SuggestionEvent[]
+  suppressions CategorySuppression[]
+
+  @@unique([sessionId, personaKey])
+}
+
+// ---------- Orders ----------
+
+model Order {
+  id               String         @id @default(cuid())
+  sessionPersonaId String
+  sessionPersona   SessionPersona @relation(fields: [sessionPersonaId], references: [id], onDelete: Cascade)
+
+  isSeedHistory      Boolean   @default(false)
+  placedAtSimDay     Int       @default(0)
+  placedAt           DateTime  @default(now())
+  packingDurationMs  Int       @default(60000)
+  deliveryDurationMs Int       @default(120000)
+  forcedStatus       String? // demo "fast forward" override: PACKING | OUT_FOR_DELIVERY | DELIVERED
+  deliveredAt        DateTime?
+
+  itemTotal   Int
+  deliveryFee Int @default(0)
+  handlingFee Int @default(19)
+  tip         Int @default(0)
+  grandTotal  Int
+
+  suggestionSurfaceShown String? // TRACKING | CART — hard cap: at most one per order
+  suggestionAttribute    String?
+  suggestionTier          String? // ASSERT | ASK | SILENCE
+
+  ratingStars  Int?
+  ratingAnswer String? // for post-delivery "did it work out" loop
+
+  createdAt DateTime @default(now())
+
+  items  OrderItem[]
+  events SuggestionEvent[]
+}
+
+model OrderItem {
+  id              String  @id @default(cuid())
+  orderId         String
+  order           Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product @relation(fields: [productId], references: [id])
+  qty             Int
+  priceAtPurchase Int
+  isAddOn         Boolean @default(false) // added via "Aur kuch?" suggestion
+}
+
+model CartItem {
+  id               String         @id @default(cuid())
+  sessionPersonaId String
+  sessionPersona   SessionPersona @relation(fields: [sessionPersonaId], references: [id], onDelete: Cascade)
+  productId        String
+  product          Product        @relation(fields: [productId], references: [id])
+  qty              Int
+
+  @@unique([sessionPersonaId, productId])
+}
+
+// ---------- Household graph ----------
+
+model GraphAttribute {
+  id               String         @id @default(cuid())
+  sessionPersonaId String
+  sessionPersona   SessionPersona @relation(fields: [sessionPersonaId], references: [id], onDelete: Cascade)
+
+  attribute     String // infant_present | toddler_present | pet_dog | ...
+  confidence    Float
+  evidence      String
+  justification String // Hinglish copy line for ASSERT surface
+  leakCategory  String?
+  leakValueInr  Int      @default(0)
+  tier          String // ASSERT | ASK | SILENCE
+  answeredYes   Boolean? // for ASK attributes once answered
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+
+  @@unique([sessionPersonaId, attribute])
+}
+
+// ---------- Guardrails ----------
+
+model CategorySuppression {
+  id                    String         @id @default(cuid())
+  sessionPersonaId      String
+  sessionPersona        SessionPersona @relation(fields: [sessionPersonaId], references: [id], onDelete: Cascade)
+  category              String
+  declineCount          Int            @default(0)
+  suppressedUntilSimDay Int?
+
+  @@unique([sessionPersonaId, category])
+}
+
+// ---------- Instrumentation ----------
+
+model SuggestionEvent {
+  id               String         @id @default(cuid())
+  sessionPersonaId String
+  sessionPersona   SessionPersona @relation(fields: [sessionPersonaId], references: [id], onDelete: Cascade)
+  orderId          String?
+  order            Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  type      String // SHOWN_ASSERT | SHOWN_ASK | TAPPED_ADD | TAPPED_NOT_NOW | ASK_ANSWERED_YES | ASK_ANSWERED_NO | DELIVERED_WITH_ADDON | REPEAT_WITHOUT_SUGGESTION | SUPPRESSED | SILENCE
+  attribute String?
+  category  String?
+  productId String?
+  surface   String? // TRACKING | CART | RATING
+  simDay    Int      @default(0)
+  metadata  Json?
+  createdAt DateTime @default(now())
+}
