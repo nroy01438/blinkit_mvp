@@ -120,8 +120,9 @@ export async function declineSuggestion(orderId: string, leakCategory: LeakCateg
 
 export async function answerAsk(attribute: AttributeKey, answeredYes: boolean, orderId: string) {
   const sp = await getOrCreateSessionPersona();
-  await respondAskAnswer(sp.id, attribute, answeredYes);
+  const product = await respondAskAnswer(orderId, sp.id, attribute, answeredYes);
   revalidatePath(`/orders/${orderId}`);
+  return product;
 }
 
 export async function submitRating(orderId: string, stars: number, answer: string | null) {

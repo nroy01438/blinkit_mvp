@@ -147,7 +147,19 @@ export async function respondNotNow(orderId: string, sessionPersonaId: string, l
   await bumpSuppression(sessionPersonaId, leakCategory, sessionPersona.simDay);
 }
 
-export async function respondAskAnswer(sessionPersonaId: string, attribute: AttributeKey, answeredYes: boolean) {
+/**
+ * Records the user's answer to an ASK-tier question. On "yes", also
+ * upgrades the household graph to ASSERT and resolves + returns the
+ * recommended product immediately, so the tracking screen can swap the
+ * question straight for a product card in the same order instead of
+ * waiting for the next order's inference pass.
+ */
+export async function respondAskAnswer(
+  orderId: string,
+  sessionPersonaId: string,
+  attribute: AttributeKey,
+  answeredYes: boolean
+) {
   const def = ATTRIBUTES[attribute];
   const existing = await db.graphAttribute.findUnique({
     where: { sessionPersonaId_attribute: { sessionPersonaId, attribute } },
@@ -164,12 +176,21 @@ export async function respondAskAnswer(sessionPersonaId: string, attribute: Attr
   await db.suggestionEvent.create({
     data: {
       sessionPersonaId,
+      orderId,
       type: answeredYes ? "ASK_ANSWERED_YES" : "ASK_ANSWERED_NO",
       attribute,
       category: def.leakCategory,
       surface: "TRACKING",
     },
   });
+
+  if (!answeredYes) return null;
+
+  await db.order.update({ where: { id: orderId }, data: { suggestionTier: "ASSERT" } });
+
+  const sku = LEAK_CATEGORY_SKUS[def.leakCategory];
+  const product = sku ? await db.product.findUnique({ where: { sku } }) : null;
+  return product && product.available ? product : null;
 }
 
 /** Instrumentation: detect a household organically repeat-purchasing a
@@ -235,11 +256,18 @@ export async function getOrderSuggestionDisplay(
   return { ...base, tier: "ASSERT" as const, product };
 }
 
+/**
+ * Whether this order's suggestion is fully resolved and should render as a
+ * static "already handled" line instead of an interactive card. Answering
+ * an ASK "yes" is deliberately excluded — it upgrades the order to ASSERT
+ * (see respondAskAnswer) and the interaction continues into that product
+ * card, so it must still render interactively until added or declined.
+ */
 export async function orderHasSuggestionResponse(orderId: string): Promise<boolean> {
   const count = await db.suggestionEvent.count({
     where: {
       orderId,
-      type: { in: ["TAPPED_ADD", "TAPPED_NOT_NOW", "ASK_ANSWERED_YES", "ASK_ANSWERED_NO"] },
+      type: { in: ["TAPPED_ADD", "TAPPED_NOT_NOW", "ASK_ANSWERED_NO"] },
     },
   });
   return count > 0;

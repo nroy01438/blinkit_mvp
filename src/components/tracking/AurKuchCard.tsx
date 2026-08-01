@@ -30,6 +30,7 @@ type LocalState = "idle" | "added" | "declined" | "answered";
 
 export function AurKuchCard({ orderId, tier, attribute, leakCategory, justification, question, product }: Props) {
   const [state, setState] = useState<LocalState>("idle");
+  const [confirmedProduct, setConfirmedProduct] = useState<AurKuchProduct | null>(null);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -55,23 +56,34 @@ export function AurKuchCard({ orderId, tier, attribute, leakCategory, justificat
     );
   }
 
-  if (tier === "ASSERT" && product) {
+  // Once an ASK question is answered "yes", the graph is upgraded to
+  // ASSERT server-side and the resolved product comes back in the same
+  // round trip — show it immediately instead of waiting for the next order.
+  const effectiveProduct = confirmedProduct ?? product;
+  const effectiveTier = confirmedProduct ? "ASSERT" : tier;
+
+  if (effectiveTier === "ASSERT" && effectiveProduct) {
     return (
       <SuggestionShell>
+        {confirmedProduct && (
+          <p className="text-[11.5px] text-action-green font-semibold mb-2">Got it — here&apos;s something for that 👇</p>
+        )}
         <div className="flex items-center gap-3">
           <div
             className="w-14 h-14 rounded-md flex items-center justify-center text-2xl shrink-0"
-            style={{ background: `linear-gradient(160deg, ${product.colorFrom}, ${product.colorTo})` }}
+            style={{ background: `linear-gradient(160deg, ${effectiveProduct.colorFrom}, ${effectiveProduct.colorTo})` }}
           >
-            {product.emoji}
+            {effectiveProduct.emoji}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[12.5px] text-text-secondary leading-snug mb-1">{justification}</p>
-            <p className="text-[13px] font-bold text-text-primary line-clamp-1">{product.name}</p>
+            {!confirmedProduct && <p className="text-[12.5px] text-text-secondary leading-snug mb-1">{justification}</p>}
+            <p className="text-[13px] font-bold text-text-primary line-clamp-1">{effectiveProduct.name}</p>
             <div className="flex items-center gap-1.5">
-              <span className="text-[12px] font-bold text-text-primary">₹{product.price}</span>
-              {product.mrp > product.price && <span className="text-[10px] text-text-muted line-through">₹{product.mrp}</span>}
-              <span className="text-[10px] text-text-muted">· {product.packSize}</span>
+              <span className="text-[12px] font-bold text-text-primary">₹{effectiveProduct.price}</span>
+              {effectiveProduct.mrp > effectiveProduct.price && (
+                <span className="text-[10px] text-text-muted line-through">₹{effectiveProduct.mrp}</span>
+              )}
+              <span className="text-[10px] text-text-muted">· {effectiveProduct.packSize}</span>
             </div>
           </div>
         </div>
@@ -80,7 +92,7 @@ export function AurKuchCard({ orderId, tier, attribute, leakCategory, justificat
             disabled={pending}
             onClick={() =>
               startTransition(async () => {
-                await addSuggestedItem(orderId, product.id);
+                await addSuggestedItem(orderId, effectiveProduct.id);
                 setState("added");
                 router.refresh();
               })
@@ -114,8 +126,21 @@ export function AurKuchCard({ orderId, tier, attribute, leakCategory, justificat
           disabled={pending}
           onClick={() =>
             startTransition(async () => {
-              await answerAsk(attribute, true, orderId);
-              setState("answered");
+              const resolved = await answerAsk(attribute, true, orderId);
+              if (resolved) {
+                setConfirmedProduct({
+                  id: resolved.id,
+                  name: resolved.name,
+                  price: resolved.price,
+                  mrp: resolved.mrp,
+                  packSize: resolved.packSize,
+                  emoji: resolved.emoji,
+                  colorFrom: resolved.colorFrom,
+                  colorTo: resolved.colorTo,
+                });
+              } else {
+                setState("answered");
+              }
               router.refresh();
             })
           }
