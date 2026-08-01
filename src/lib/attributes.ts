@@ -101,6 +101,21 @@ export const ATTRIBUTES: Record<AttributeKey, AttributeDef> = {
 
 export const ATTRIBUTE_KEYS = Object.keys(ATTRIBUTES) as AttributeKey[];
 
+/** Plain-English names for each leak category, for display on the
+ * instrumentation dashboard (the raw keys are snake_case internal IDs). */
+export const LEAK_CATEGORY_LABELS: Record<LeakCategoryKey, string> = {
+  baby_diapers_wipes: "Diapers & baby wipes",
+  toddler_snacks: "Toddler snacks",
+  pet_food_dog: "Dog food",
+  pet_food_cat: "Cat food",
+  elderly_care: "Elderly & adult care products",
+  sports_nutrition: "Sports nutrition / protein",
+  party_hosting_supplies: "Party & hosting supplies",
+  new_home_essentials: "New-home essentials",
+  bulk_staples: "Bulk household staples",
+  plant_protein: "Plant-based protein",
+};
+
 /** Where a leak category lives in the catalog taxonomy, used to check in
  * code (never trusting the model) whether the household has already
  * purchased from it — if so, it is never a leak. */
