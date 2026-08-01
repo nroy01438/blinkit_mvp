@@ -73,8 +73,8 @@ model Order {
   isSeedHistory      Boolean   @default(false)
   placedAtSimDay     Int       @default(0)
   placedAt           DateTime  @default(now())
-  packingDurationMs  Int       @default(60000)
-  deliveryDurationMs Int       @default(120000)
+  packingDurationMs  Int       @default(15000)
+  deliveryDurationMs Int       @default(25000)
   forcedStatus       String? // demo "fast forward" override: PACKING | OUT_FOR_DELIVERY | DELIVERED
   deliveredAt        DateTime?
 
