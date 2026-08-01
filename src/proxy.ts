@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const SESSION_COOKIE = "ak_sid";
 const PERSONA_COOKIE = "ak_persona";
-const VALID_PERSONAS = new Set(["priya", "rohit", "ananya", "vikram"]);
+const VALID_PERSONAS = new Set(["priya", "rohit", "ananya", "vikram", "guest"]);
 
 export function proxy(req: NextRequest) {
   const requestHeaders = new Headers(req.headers);

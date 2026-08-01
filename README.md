@@ -63,6 +63,9 @@ npm run dev
   active order's status, advance the simulated day counter (for suppression windows),
   and reset a persona's state.
 - Deep-link directly to a persona's state with `?persona=priya` (`priya` / `rohit` /
-  `ananya` / `vikram`).
+  `ananya` / `vikram` / `guest`).
+- `?persona=guest` (or the "Guest" button in the demo panel) starts from a blank slate —
+  no seeded order history — so a real stranger's Aur Kuch? suggestions are inferred only
+  from orders they actually place, instead of Priya's pre-built history.
 - `/internal` is the instrumentation dashboard (household graph, funnel, suppression log,
   leak ledger) — not linked from consumer navigation.

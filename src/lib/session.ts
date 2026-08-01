@@ -9,12 +9,12 @@ import { recomputeGraph } from "@/lib/graph/engine";
 
 export const SESSION_COOKIE = "ak_sid";
 export const PERSONA_COOKIE = "ak_persona";
-export type PersonaKey = "priya" | "rohit" | "ananya" | "vikram";
+export type PersonaKey = "priya" | "rohit" | "ananya" | "vikram" | "guest";
 
 export async function getCookiePersonaKey(): Promise<PersonaKey> {
   const jar = await cookies();
   const val = jar.get(PERSONA_COOKIE)?.value;
-  if (val === "priya" || val === "rohit" || val === "ananya" || val === "vikram") return val;
+  if (val === "priya" || val === "rohit" || val === "ananya" || val === "vikram" || val === "guest") return val;
   return "priya";
 }
 

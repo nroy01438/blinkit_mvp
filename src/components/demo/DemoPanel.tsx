@@ -15,6 +15,7 @@ const PERSONAS: { key: PersonaKey; label: string; emoji: string }[] = [
   { key: "rohit", label: "Rohit", emoji: "🐕" },
   { key: "ananya", label: "Ananya", emoji: "🏋️‍♀️" },
   { key: "vikram", label: "Vikram", emoji: "🧑‍💼" },
+  { key: "guest", label: "Guest", emoji: "🙋" },
 ];
 
 export function DemoPanel({ currentPersona, simDay }: { currentPersona: string; simDay: number }) {
