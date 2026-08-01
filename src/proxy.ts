@@ -4,7 +4,7 @@ const SESSION_COOKIE = "ak_sid";
 const PERSONA_COOKIE = "ak_persona";
 const VALID_PERSONAS = new Set(["priya", "rohit", "ananya", "vikram"]);
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const requestHeaders = new Headers(req.headers);
   const cookiesToSet: { name: string; value: string }[] = [];
 
