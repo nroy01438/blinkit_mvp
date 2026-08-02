@@ -11,6 +11,14 @@ export const SESSION_COOKIE = "ak_sid";
 export const PERSONA_COOKIE = "ak_persona";
 export type PersonaKey = "priya" | "rohit" | "ananya" | "vikram" | "guest";
 
+// The four named demo personas, each with an engineered order history —
+// eagerly "baked" (seeded + inferred) for every session in the background
+// so a judge switching tabs on /internal always finds a full household
+// graph waiting, not "No guesses yet". Guest is deliberately excluded: it
+// has no seed history, so its graph should stay genuinely blank until the
+// visitor places a real order.
+const NAMED_PERSONAS: PersonaKey[] = ["priya", "rohit", "ananya", "vikram"];
+
 export async function getCookiePersonaKey(): Promise<PersonaKey> {
   const jar = await cookies();
   const val = jar.get(PERSONA_COOKIE)?.value;
@@ -84,11 +92,53 @@ async function materializeSeedHistory(sessionPersonaId: string, personaKey: Pers
   }
 }
 
+async function createAndSeedPersona(sessionId: string, personaKey: PersonaKey) {
+  const created = await db.sessionPersona.create({ data: { sessionId, personaKey } });
+  await materializeSeedHistory(created.id, personaKey);
+  return created;
+}
+
+/** Creates, seeds, and infers the household graph for a persona that
+ * doesn't exist yet in this session — entirely in the background (the
+ * caller wraps this in `after()`). Used both for the persona the visitor
+ * is actively browsing as and to eagerly warm up the other named demo
+ * personas. */
+async function provisionPersonaFully(sessionId: string, personaKey: PersonaKey) {
+  const created = await createAndSeedPersona(sessionId, personaKey);
+  try {
+    await recomputeGraph(created.id);
+  } catch (err) {
+    console.error(`background graph warm-up failed for ${personaKey}`, err);
+  }
+  return created;
+}
+
+/** Best-effort, self-healing warm-up: on every request, check which of the
+ * four named demo personas this session is still missing and provision
+ * them in the background. Once all four exist it's a single cheap no-op
+ * lookup, so it's safe to call unconditionally. */
+function scheduleOtherPersonaWarmup(sessionId: string, currentKey: PersonaKey) {
+  after(async () => {
+    const existingKeys = new Set(
+      (await db.sessionPersona.findMany({ where: { sessionId }, select: { personaKey: true } })).map((p) => p.personaKey)
+    );
+    for (const key of NAMED_PERSONAS) {
+      if (key === currentKey || existingKeys.has(key)) continue;
+      await provisionPersonaFully(sessionId, key).catch((err) =>
+        console.error(`background provisioning failed for ${key}`, err)
+      );
+    }
+  });
+}
+
 /**
  * Resolves (and lazily creates) the SessionPersona for the current visitor +
  * active persona cookie. On first creation, materializes that persona's
  * seed order history and kicks off a background household-graph inference
- * pass via `after()` so it doesn't block first paint.
+ * pass via `after()` so it doesn't block first paint. Also eagerly warms up
+ * the other named demo personas in the background (see
+ * scheduleOtherPersonaWarmup) so the instrumentation dashboard is always
+ * ready to show off, not just for whichever persona is currently active.
  */
 export const getOrCreateSessionPersona = cache(async function getOrCreateSessionPersona() {
   const sessionId = await getSessionId();
@@ -103,13 +153,12 @@ export const getOrCreateSessionPersona = cache(async function getOrCreateSession
   const existing = await db.sessionPersona.findUnique({
     where: { sessionId_personaKey: { sessionId, personaKey } },
   });
-  if (existing) return existing;
+  if (existing) {
+    scheduleOtherPersonaWarmup(sessionId, personaKey);
+    return existing;
+  }
 
-  const created = await db.sessionPersona.create({
-    data: { sessionId, personaKey },
-  });
-
-  await materializeSeedHistory(created.id, personaKey);
+  const created = await createAndSeedPersona(sessionId, personaKey);
 
   after(async () => {
     try {
@@ -118,6 +167,7 @@ export const getOrCreateSessionPersona = cache(async function getOrCreateSession
       console.error("background graph warm-up failed", err);
     }
   });
+  scheduleOtherPersonaWarmup(sessionId, personaKey);
 
   return created;
 });
