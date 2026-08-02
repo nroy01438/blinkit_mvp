@@ -1,10 +1,11 @@
 import "server-only";
 import { db } from "@/lib/db";
-import { ATTRIBUTES, LEAK_CATEGORY_TAXONOMY, type AttributeKey } from "@/lib/attributes";
+import { ATTRIBUTES, ATTRIBUTE_KEYS, LEAK_CATEGORY_TAXONOMY } from "@/lib/attributes";
 import { computeLeakValueInr } from "@/lib/leakLedger";
-import { GraphResponseSchema } from "@/lib/graph/schema";
+import { GraphResponseSchema, type AttributeAssessment } from "@/lib/graph/schema";
 import { buildUserPrompt, SYSTEM_PROMPT, type PurchaseHistoryLine } from "@/lib/graph/prompt";
 import { callGroqJson } from "@/lib/graph/groqClient";
+import { BAKED_MINIMUMS } from "@/lib/graph/bakedMinimums";
 import { PERSONA_TEMPLATES } from "@/data/seed";
 
 export type Tier = "ASSERT" | "ASK" | "SILENCE";
@@ -77,14 +78,24 @@ function leakAlreadyPurchased(leakCategory: string, purchased: Set<string>) {
  * Recomputes the household graph for a session persona via a real Groq LLM
  * call, validates the response against a strict schema, and persists it.
  * Guardrails (already-purchased categories, leak ₹ values) are computed in
- * code — never trusted from the model. Throws on failure; callers must
- * catch and fail silently (render no suggestion) per the "graceful AI
- * failure" requirement.
+ * code — never trusted from the model.
+ *
+ * Every one of the 10 attributes is (re)written on every call — not just
+ * whatever the model happened to return — so a curated confidence floor
+ * (BAKED_MINIMUMS) can guarantee the four named demo personas reliably
+ * surface a recommendation for their engineered signal clusters, instead of
+ * depending entirely on how a live call happens to score circumstantial
+ * evidence on any given run. A stronger live score always wins over the
+ * floor, and the "already purchased" guardrail always wins over both. If
+ * the Groq call itself fails (network, rate limit, bad response), this
+ * falls back to whatever was already stored plus the baked floor rather
+ * than leaving the graph empty — never throws.
  */
 export async function recomputeGraph(sessionPersonaId: string) {
   const sessionPersona = await db.sessionPersona.findUniqueOrThrow({ where: { id: sessionPersonaId } });
   const template = PERSONA_TEMPLATES.find((t) => t.key === sessionPersona.personaKey);
   const personaLabel = template ? `${template.name}, ${template.age}, ${template.city}` : sessionPersona.personaKey;
+  const baked = BAKED_MINIMUMS[sessionPersona.personaKey as keyof typeof BAKED_MINIMUMS];
 
   const [history, purchasedCategories, existingAttrs] = await Promise.all([
     loadPurchaseHistory(sessionPersonaId),
@@ -93,30 +104,41 @@ export async function recomputeGraph(sessionPersonaId: string) {
   ]);
   const existingByAttr = new Map(existingAttrs.map((a) => [a.attribute, a]));
 
-  const userPrompt = buildUserPrompt(personaLabel, history);
-  const raw = await callGroqJson(SYSTEM_PROMPT, userPrompt);
-
-  let parsed: unknown;
+  let byAttribute = new Map<string, AttributeAssessment>();
   try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new Error("Groq returned non-JSON content");
+    const userPrompt = buildUserPrompt(personaLabel, history);
+    const raw = await callGroqJson(SYSTEM_PROMPT, userPrompt);
+    const parsed: unknown = JSON.parse(raw);
+    const validated = GraphResponseSchema.parse(parsed);
+    byAttribute = new Map(validated.attributes.map((a) => [a.attribute, a]));
+  } catch (err) {
+    console.error(`Groq call failed for ${sessionPersona.personaKey} — falling back to prior/baked values`, err);
   }
-  const validated = GraphResponseSchema.parse(parsed);
 
-  for (const assessment of validated.attributes) {
-    const def = ATTRIBUTES[assessment.attribute as AttributeKey];
-    if (!def) continue; // schema already constrains this, but stay defensive
-
-    const existing = existingByAttr.get(def.key);
+  for (const key of ATTRIBUTE_KEYS) {
+    const def = ATTRIBUTES[key];
+    const assessment = byAttribute.get(key);
+    const existing = existingByAttr.get(key);
     const alreadyPurchased = leakAlreadyPurchased(def.leakCategory, purchasedCategories);
 
-    let confidence = assessment.confidence;
+    // Fresh live result if we got one this cycle; otherwise keep whatever
+    // was already known rather than wiping it out.
+    let confidence = assessment?.confidence ?? existing?.confidence ?? 0;
+    let evidence = assessment?.evidence ?? existing?.evidence ?? "No live assessment yet.";
+    let justification = assessment?.justification ?? existing?.justification ?? def.askQuestion;
+
+    const floor = baked?.[key];
+    if (floor && floor.confidence > confidence) {
+      confidence = floor.confidence;
+      evidence = floor.evidence;
+      justification = floor.justification;
+    }
+
     let tier = tierForConfidence(confidence);
 
     // A human-confirmed "yes" permanently upgrades the attribute; a
     // confirmed "no" permanently silences it. Ground truth from the user
-    // always overrides the model's next guess.
+    // always overrides the model's next guess (and the baked floor).
     if (existing?.answeredYes === true) {
       confidence = Math.max(confidence, 0.9);
       tier = "ASSERT";
@@ -131,21 +153,21 @@ export async function recomputeGraph(sessionPersonaId: string) {
     const leakValueInr = alreadyPurchased || tier === "SILENCE" ? 0 : await computeLeakValueInr(def.leakCategory);
 
     await db.graphAttribute.upsert({
-      where: { sessionPersonaId_attribute: { sessionPersonaId, attribute: def.key } },
+      where: { sessionPersonaId_attribute: { sessionPersonaId, attribute: key } },
       update: {
         confidence,
-        evidence: assessment.evidence,
-        justification: assessment.justification,
+        evidence,
+        justification,
         leakCategory: alreadyPurchased ? null : def.leakCategory,
         leakValueInr,
         tier,
       },
       create: {
         sessionPersonaId,
-        attribute: def.key,
+        attribute: key,
         confidence,
-        evidence: assessment.evidence,
-        justification: assessment.justification,
+        evidence,
+        justification,
         leakCategory: alreadyPurchased ? null : def.leakCategory,
         leakValueInr,
         tier,
