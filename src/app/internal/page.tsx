@@ -85,6 +85,13 @@ export default async function InternalDashboard({
   const activeLeakTotal = leakLedgerByPersona.get(active.personaKey) ?? 0;
   const aggregateLeakTotal = Array.from(leakLedgerByPersona.values()).reduce((s, v) => s + v, 0);
 
+  const activeFunnel = {
+    shown: events.filter((e) => e.type === "SHOWN_ASSERT" || e.type === "SHOWN_ASK").length,
+    added: events.filter((e) => e.type === "TAPPED_ADD").length,
+    repeatWithoutSuggestion: events.filter((e) => e.type === "REPEAT_WITHOUT_SUGGESTION").length,
+  };
+  const narrative = buildNarrative(activeName, attributes, activeLeakTotal, activeFunnel);
+
   return (
     <div className="min-h-screen bg-[#0B0F14] text-slate-200 font-mono text-[13px]">
       <div className="border-b border-slate-800 bg-[#0F1520] px-5 py-3 sticky top-0 z-10">
@@ -104,19 +111,22 @@ export default async function InternalDashboard({
         <section className="border border-slate-800 rounded-lg p-4 bg-[#0F1520]">
           <h2 className="text-[13px] font-bold text-white mb-2">What am I looking at?</h2>
           <p className="text-[12.5px] text-slate-300 leading-relaxed mb-2">
-            <span className="font-bold text-white">The problem:</span> Blinkit doesn&apos;t know anything about a household beyond
+            <span className="font-bold text-white">The problem:</span>{" "}
+            Blinkit doesn&apos;t know anything about a household beyond
             what&apos;s in the cart. So a new parent still buys diapers on Amazon, a dog owner still buys dog food on BigBasket —
             revenue that quietly &quot;leaks&quot; to other apps, order after order.
           </p>
           <p className="text-[12.5px] text-slate-300 leading-relaxed mb-2">
-            <span className="font-bold text-white">The fix — &quot;Aur Kuch?&quot; (&quot;anything else?&quot;):</span> an LLM reads
+            <span className="font-bold text-white">The fix — &quot;Aur Kuch?&quot; (&quot;anything else?&quot;):</span>{" "}
+            an LLM reads
             a household&apos;s <em>entire</em> real order history and infers unstated facts about them — a baby in the house, a
             dog, a gym habit, an elderly parent — then, at most, makes <em>one</em> relevant nudge on the cart page, before
             checkout, while there&apos;s still time to act on it. Never more than once per checkout, and never for something
             they already buy here.
           </p>
           <p className="text-[12.5px] text-slate-300 leading-relaxed mb-3">
-            <span className="font-bold text-white">This page</span> is the AI&apos;s working — every guess it made, how confident
+            <span className="font-bold text-white">This page</span>{" "}
+            is the AI&apos;s working — every guess it made, how confident
             it was, and whether the guess turned into a sale. Nothing here is customer-facing; it exists so anyone (you, a
             teammate, an investor) can audit the AI instead of taking its word for it.
           </p>
@@ -156,6 +166,19 @@ export default async function InternalDashboard({
           {PERSONA_BLURBS[active.personaKey] && (
             <p className="text-[11.5px] text-slate-400 mt-2 italic">{PERSONA_BLURBS[active.personaKey]}</p>
           )}
+        </section>
+
+        {/* Plain-English narrative — the same numbers as the sections below,
+            just read aloud instead of left for you to piece together. */}
+        <section className="border border-emerald-400/30 rounded-lg p-4 bg-emerald-400/[0.04]">
+          <h2 className="text-[11px] tracking-[0.15em] text-emerald-400 font-bold mb-2">IN PLAIN ENGLISH, RIGHT NOW</h2>
+          <div className="flex flex-col gap-1.5">
+            {narrative.map((line, i) => (
+              <p key={i} className="text-[13px] text-slate-200 leading-relaxed">
+                {line}
+              </p>
+            ))}
+          </div>
         </section>
 
         {/* Stat cards */}
@@ -325,6 +348,79 @@ export default async function InternalDashboard({
       </div>
     </div>
   );
+}
+
+interface NarrativeAttr {
+  attribute: string;
+  tier: string;
+  confidence: number;
+  leakCategory: string | null;
+  leakValueInr: number;
+}
+
+function attrLabel(a: NarrativeAttr): string {
+  return ATTRIBUTES[a.attribute as keyof typeof ATTRIBUTES]?.label ?? a.attribute;
+}
+
+function joinEnglish(items: string[]): string {
+  if (items.length <= 1) return items.join("");
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+}
+
+/** Turns the same numbers shown in the sections below into a short, plain
+ * paragraph — for someone who wants the story, not a spreadsheet to read. */
+function buildNarrative(
+  personaName: string,
+  attributes: NarrativeAttr[],
+  leakTotal: number,
+  funnel: { shown: number; added: number; repeatWithoutSuggestion: number }
+): string[] {
+  if (attributes.length === 0) {
+    return [
+      `The AI hasn't looked at ${personaName} yet. Visit a storefront page for this persona, or place an order, to trigger it — it re-runs after every order.`,
+    ];
+  }
+
+  const assertAttrs = attributes.filter((a) => a.tier === "ASSERT");
+  const askAttrs = attributes.filter((a) => a.tier === "ASK");
+  const silenceCount = attributes.filter((a) => a.tier === "SILENCE").length;
+  const lines: string[] = [];
+
+  if (assertAttrs.length > 0) {
+    lines.push(
+      `The AI is confident about ${assertAttrs.length === 1 ? "one thing" : `${assertAttrs.length} things`} for ${personaName}: ${joinEnglish(
+        assertAttrs.map((a) => attrLabel(a).toLowerCase())
+      )}. If it's right, that's roughly ₹${leakTotal}/month ${personaName} is likely spending on those categories elsewhere — money Blinkit isn't currently capturing.`
+    );
+  } else {
+    lines.push(`The AI isn't confident enough about anything for ${personaName} yet to recommend a product outright.`);
+  }
+
+  if (askAttrs.length > 0) {
+    lines.push(
+      `It's unsure about ${askAttrs.length === 1 ? "one more thing" : `${askAttrs.length} more things`} — ${joinEnglish(
+        askAttrs.map((a) => attrLabel(a).toLowerCase())
+      )} — so instead of guessing, it'll ask a quick yes/no question on the next cart visit rather than assume.`
+    );
+  }
+
+  if (silenceCount > 0) {
+    lines.push(
+      `For the other ${silenceCount} possible household fact${silenceCount === 1 ? "" : "s"}, there simply isn't enough evidence in the order history yet — so it says nothing, on purpose, rather than make something up.`
+    );
+  }
+
+  if (funnel.shown > 0) {
+    lines.push(
+      `So far, ${personaName} has been shown a suggestion ${funnel.shown} time${funnel.shown === 1 ? "" : "s"} and added it to cart ${funnel.added} time${funnel.added === 1 ? "" : "s"}.` +
+        (funnel.repeatWithoutSuggestion > 0
+          ? ` There ${funnel.repeatWithoutSuggestion === 1 ? "was" : "were"} also ${funnel.repeatWithoutSuggestion} case${funnel.repeatWithoutSuggestion === 1 ? "" : "s"} where they bought a known leak item on their own without ever being asked — the gap this whole feature exists to close.`
+          : "")
+    );
+  }
+
+  return lines;
 }
 
 function StatCard({ label, value, accent, sub }: { label: string; value: string; accent: "emerald" | "amber" | "rose"; sub?: string }) {

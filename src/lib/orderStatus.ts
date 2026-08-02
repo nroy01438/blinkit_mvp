@@ -11,7 +11,7 @@ interface OrderTiming {
   isSeedHistory: boolean;
 }
 
-const PLACED_PHASE_MS = 4000;
+const PLACED_PHASE_MS = 1500;
 
 export function computeStatus(order: OrderTiming): OrderStatus {
   if (order.isSeedHistory) return "DELIVERED";
