@@ -12,7 +12,10 @@ import { computeStatus } from "@/lib/orderStatus";
 
 export async function switchPersonaAction(key: PersonaKey) {
   await setCookiePersonaKey(key);
-  await getOrCreateSessionPersona();
+  const sp = await getOrCreateSessionPersona();
+  // Switching persona is a fresh start, not a continuation — never carry a
+  // leftover cart from an earlier visit to this persona into the new one.
+  await db.cartItem.deleteMany({ where: { sessionPersonaId: sp.id } });
   revalidatePath("/", "layout");
 }
 

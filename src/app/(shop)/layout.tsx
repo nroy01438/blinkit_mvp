@@ -35,7 +35,10 @@ async function SessionShell({ children, modal }: { children: React.ReactNode; mo
   const count = cartItems.reduce((s, i) => s + i.qty, 0);
 
   return (
-    <CartProvider initialQtyMap={qtyMap} initialCount={count} initialItemTotal={totals.itemTotal}>
+    // Keyed by the active persona so switching persona (or a fresh-navigation
+    // cart clear) remounts the provider instead of keeping stale client-side
+    // qty state around from whichever persona was active before.
+    <CartProvider key={sp.id} initialQtyMap={qtyMap} initialCount={count} initialItemTotal={totals.itemTotal}>
       <DesktopHeader city={template?.city ?? "Gurgaon"} personaName={template?.name ?? "Guest"} />
       <MobileHeader city={template?.city ?? "Gurgaon"} />
       <div className="flex-1">{children}</div>

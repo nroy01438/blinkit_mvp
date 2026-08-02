@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { after } from "next/server";
 import { db } from "@/lib/db";
 import { PERSONA_TEMPLATES } from "@/data/seed";
@@ -113,6 +113,21 @@ async function provisionPersonaFully(sessionId: string, personaKey: PersonaKey) 
   return created;
 }
 
+/** A hard page load — browser refresh, a typed/pasted URL, a plain (non-JS)
+ * link, or the initial visit — should start the demo over with an empty
+ * cart, so leftover items from an earlier test run never carry forward.
+ * Detected via the standard `Sec-Fetch-Dest` fetch-metadata header, which
+ * browsers only set to "document" for an actual top-level navigation that
+ * (re)loads the HTML document. Next's own client-side transitions — Link
+ * clicks, the cart's intercepted-route drawer, router.refresh(), server
+ * actions like adding an item to the cart — are all background fetches
+ * (`Sec-Fetch-Dest: empty`), so ordinary in-app browsing never hits this. */
+async function clearCartOnFreshNavigation(sessionPersonaId: string) {
+  const hdrs = await headers();
+  if (hdrs.get("sec-fetch-dest") !== "document") return;
+  await db.cartItem.deleteMany({ where: { sessionPersonaId } });
+}
+
 /** Guest has no seed history, so its graph should only ever reflect real
  * orders it has actually placed — never a guess manufactured from "(no
  * orders yet)". Self-healing: if an older build left behind attribute rows
@@ -166,6 +181,7 @@ export const getOrCreateSessionPersona = cache(async function getOrCreateSession
   });
   if (existing) {
     if (personaKey === "guest") after(() => cleanupStaleGuestGraph(existing.id));
+    await clearCartOnFreshNavigation(existing.id);
     scheduleOtherPersonaWarmup(sessionId, personaKey);
     return existing;
   }
