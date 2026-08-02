@@ -8,12 +8,10 @@ import { callGroqJson } from "@/lib/graph/groqClient";
 import { BAKED_MINIMUMS } from "@/lib/graph/bakedMinimums";
 import { PERSONA_TEMPLATES } from "@/data/seed";
 
-export type Tier = "ASSERT" | "ASK" | "SILENCE";
+export type Tier = "ASSERT" | "SILENCE";
 
 export function tierForConfidence(confidence: number): Tier {
-  if (confidence >= 0.65) return "ASSERT";
-  if (confidence >= 0.35) return "ASK";
-  return "SILENCE";
+  return confidence >= 0.65 ? "ASSERT" : "SILENCE";
 }
 
 async function loadPurchaseHistory(sessionPersonaId: string): Promise<PurchaseHistoryLine[]> {
@@ -125,7 +123,7 @@ export async function recomputeGraph(sessionPersonaId: string) {
     // was already known rather than wiping it out.
     let confidence = assessment?.confidence ?? existing?.confidence ?? 0;
     let evidence = assessment?.evidence ?? existing?.evidence ?? "No live assessment yet.";
-    let justification = assessment?.justification ?? existing?.justification ?? def.askQuestion;
+    let justification = assessment?.justification ?? existing?.justification ?? def.label;
 
     const floor = baked?.[key];
     if (floor && floor.confidence > confidence) {
@@ -135,16 +133,6 @@ export async function recomputeGraph(sessionPersonaId: string) {
     }
 
     let tier = tierForConfidence(confidence);
-
-    // A human-confirmed "yes" permanently upgrades the attribute; a
-    // confirmed "no" permanently silences it. Ground truth from the user
-    // always overrides the model's next guess (and the baked floor).
-    if (existing?.answeredYes === true) {
-      confidence = Math.max(confidence, 0.9);
-      tier = "ASSERT";
-    } else if (existing?.answeredYes === false) {
-      tier = "SILENCE";
-    }
 
     if (alreadyPurchased) {
       tier = "SILENCE";

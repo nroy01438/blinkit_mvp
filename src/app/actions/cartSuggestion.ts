@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { getOrCreateSessionPersona } from "@/lib/session";
-import { respondNotNow, respondAskAnswer } from "@/lib/suggestion";
+import { respondNotNow } from "@/lib/suggestion";
 import type { AttributeKey, LeakCategoryKey } from "@/lib/attributes";
 
 async function markCartSuggestionSpent(sessionPersonaId: string) {
@@ -39,19 +39,4 @@ export async function declineCartSuggestionAction(leakCategory: LeakCategoryKey)
   await respondNotNow(sp.id, leakCategory);
   await markCartSuggestionSpent(sp.id);
   revalidatePath("/cart");
-}
-
-export async function answerCartAskAction(attribute: AttributeKey, answeredYes: boolean) {
-  const sp = await getOrCreateSessionPersona();
-  const product = await respondAskAnswer(sp.id, attribute, answeredYes);
-  // A "yes" only reveals the product — it upgrades the graph attribute to
-  // ASSERT (see respondAskAnswer) but deliberately doesn't add to cart or
-  // spend the per-checkout budget yet, so the card stays live for the
-  // customer to actually confirm with "Add to this bag" (or "Not now").
-  // A "no" is final: silence the attribute and spend the budget.
-  if (!answeredYes) {
-    await markCartSuggestionSpent(sp.id);
-  }
-  revalidatePath("/", "layout");
-  return product;
 }

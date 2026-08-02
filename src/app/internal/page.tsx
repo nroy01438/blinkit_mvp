@@ -9,19 +9,16 @@ export const metadata = { robots: { index: false, follow: false } };
 
 const TIER_COLOR: Record<string, string> = {
   ASSERT: "text-emerald-400 border-emerald-400/30 bg-emerald-400/10",
-  ASK: "text-amber-400 border-amber-400/30 bg-amber-400/10",
   SILENCE: "text-slate-500 border-slate-500/30 bg-slate-500/10",
 };
 
 const TIER_BAR_COLOR: Record<string, string> = {
   ASSERT: "bg-emerald-400",
-  ASK: "bg-amber-400",
   SILENCE: "bg-slate-600",
 };
 
 const TIER_EXPLANATION: Record<string, string> = {
   ASSERT: "Confident enough to recommend a product outright.",
-  ASK: "Not fully sure — asks a quick yes/no question first.",
   SILENCE: "Not enough evidence — says nothing rather than guess.",
 };
 
@@ -35,11 +32,8 @@ const PERSONA_BLURBS: Record<string, string> = {
 
 const EVENT_LABELS: Record<string, string> = {
   SHOWN_ASSERT: "AI showed a product recommendation",
-  SHOWN_ASK: "AI asked a yes/no question",
   TAPPED_ADD: "Customer added the suggestion to cart",
   TAPPED_NOT_NOW: "Customer dismissed the suggestion",
-  ASK_ANSWERED_YES: "Customer answered “Yes”",
-  ASK_ANSWERED_NO: "Customer answered “No”",
   DELIVERED_WITH_ADDON: "Order delivered with the AI's add-on in it",
   REPEAT_WITHOUT_SUGGESTION: "Customer repeat-bought a known leak — AI said nothing",
   SUPPRESSED: "AI muted this topic (2 declines in a row)",
@@ -69,7 +63,7 @@ export default async function InternalDashboard({
   ]);
 
   const funnel = {
-    shown: allEvents.filter((e) => e.type === "SHOWN_ASSERT" || e.type === "SHOWN_ASK").length,
+    shown: allEvents.filter((e) => e.type === "SHOWN_ASSERT").length,
     tapped: allEvents.filter((e) => e.type === "TAPPED_ADD" || e.type === "TAPPED_NOT_NOW").length,
     added: allEvents.filter((e) => e.type === "TAPPED_ADD").length,
     delivered: allEvents.filter((e) => e.type === "DELIVERED_WITH_ADDON").length,
@@ -86,7 +80,7 @@ export default async function InternalDashboard({
   const aggregateLeakTotal = Array.from(leakLedgerByPersona.values()).reduce((s, v) => s + v, 0);
 
   const activeFunnel = {
-    shown: events.filter((e) => e.type === "SHOWN_ASSERT" || e.type === "SHOWN_ASK").length,
+    shown: events.filter((e) => e.type === "SHOWN_ASSERT").length,
     added: events.filter((e) => e.type === "TAPPED_ADD").length,
     repeatWithoutSuggestion: events.filter((e) => e.type === "REPEAT_WITHOUT_SUGGESTION").length,
   };
@@ -230,7 +224,7 @@ export default async function InternalDashboard({
             The AI checks 10 possible household facts on every order. Each one lands in exactly one bucket:
           </p>
           <div className="flex gap-3">
-            {(["ASSERT", "ASK", "SILENCE"] as const).map((t) => (
+            {(["ASSERT", "SILENCE"] as const).map((t) => (
               <div key={t} className={`flex-1 border rounded-md px-3 py-2 ${TIER_COLOR[t]}`}>
                 <p className="text-[10px] tracking-wide font-bold">{t}</p>
                 <p className="text-[20px] font-bold">{attributes.filter((a) => a.tier === t).length}</p>
@@ -272,9 +266,6 @@ export default async function InternalDashboard({
                     If true, we estimate this household spends ₹{a.leakValueInr}/mo elsewhere on{" "}
                     {LEAK_CATEGORY_LABELS[a.leakCategory as keyof typeof LEAK_CATEGORY_LABELS] ?? a.leakCategory}.
                   </p>
-                )}
-                {a.answeredYes !== null && (
-                  <p className="text-[10.5px] text-amber-400 mt-1">Customer was asked directly and answered: {a.answeredYes ? "YES" : "NO"}</p>
                 )}
               </div>
             ))}
@@ -383,7 +374,6 @@ function buildNarrative(
   }
 
   const assertAttrs = attributes.filter((a) => a.tier === "ASSERT");
-  const askAttrs = attributes.filter((a) => a.tier === "ASK");
   const silenceCount = attributes.filter((a) => a.tier === "SILENCE").length;
   const lines: string[] = [];
 
@@ -394,15 +384,7 @@ function buildNarrative(
       )}. If it's right, that's roughly ₹${leakTotal}/month ${personaName} is likely spending on those categories elsewhere — money Blinkit isn't currently capturing.`
     );
   } else {
-    lines.push(`The AI isn't confident enough about anything for ${personaName} yet to recommend a product outright.`);
-  }
-
-  if (askAttrs.length > 0) {
-    lines.push(
-      `It's unsure about ${askAttrs.length === 1 ? "one more thing" : `${askAttrs.length} more things`} — ${joinEnglish(
-        askAttrs.map((a) => attrLabel(a).toLowerCase())
-      )} — so instead of guessing, it'll ask a quick yes/no question on the next cart visit rather than assume.`
-    );
+    lines.push(`The AI isn't confident enough about anything for ${personaName} yet to recommend a product.`);
   }
 
   if (silenceCount > 0) {

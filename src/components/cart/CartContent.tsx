@@ -85,32 +85,21 @@ export async function CartContent() {
               buried by scroll, never missable. */}
           {suggestion && (
             <div className="px-4 pt-3 pb-1 border-t border-divider shrink-0">
-              {suggestion.tier === "ASSERT" && suggestion.productId ? (
-                <AurKuchCard
-                  tier="ASSERT"
-                  attribute={suggestion.attribute}
-                  leakCategory={suggestion.leakCategory}
-                  justification={suggestion.justification}
-                  product={{
-                    id: suggestion.productId,
-                    name: suggestion.productName!,
-                    price: suggestion.productPrice!,
-                    mrp: suggestion.productMrp!,
-                    packSize: suggestion.productPackSize!,
-                    emoji: suggestion.productEmoji!,
-                    colorFrom: suggestion.productColorFrom!,
-                    colorTo: suggestion.productColorTo!,
-                  }}
-                />
-              ) : (
-                <AurKuchCard
-                  tier="ASK"
-                  attribute={suggestion.attribute}
-                  leakCategory={suggestion.leakCategory}
-                  justification={suggestion.justification}
-                  question={suggestion.question}
-                />
-              )}
+              <AurKuchCard
+                attribute={suggestion.attribute}
+                leakCategory={suggestion.leakCategory}
+                justification={suggestion.justification}
+                product={{
+                  id: suggestion.productId,
+                  name: suggestion.productName,
+                  price: suggestion.productPrice,
+                  mrp: suggestion.productMrp,
+                  packSize: suggestion.productPackSize,
+                  emoji: suggestion.productEmoji,
+                  colorFrom: suggestion.productColorFrom,
+                  colorTo: suggestion.productColorTo,
+                }}
+              />
             </div>
           )}
 

@@ -1,5 +1,5 @@
 // The 10 household attributes the graph can infer, and how each maps to a
-// "leak" product category plus the copy used on the ASK surface.
+// "leak" product category.
 
 export type AttributeKey =
   | "infant_present"
@@ -29,11 +29,6 @@ export interface AttributeDef {
   key: AttributeKey;
   label: string;
   leakCategory: LeakCategoryKey;
-  /** Short yes/no question shown in ASK mode. Deterministic UI copy — the
-   * inference itself (which attribute, what confidence) is entirely the
-   * model's output; this is just the fixed phrasing for a fixed set of
-   * possible household facts. */
-  askQuestion: string;
 }
 
 export const ATTRIBUTES: Record<AttributeKey, AttributeDef> = {
@@ -41,61 +36,51 @@ export const ATTRIBUTES: Record<AttributeKey, AttributeDef> = {
     key: "infant_present",
     label: "Infant in household",
     leakCategory: "baby_diapers_wipes",
-    askQuestion: "Quick one — chhota baby ghar mein hai kya? 👶",
   },
   toddler_present: {
     key: "toddler_present",
     label: "Toddler in household",
     leakCategory: "toddler_snacks",
-    askQuestion: "Ghar mein toddler hai kya (1-4 saal)? 🧒",
   },
   pet_dog: {
     key: "pet_dog",
     label: "Dog owner",
     leakCategory: "pet_food_dog",
-    askQuestion: "Quick one — dog hai ghar mein? 🐕",
   },
   pet_cat: {
     key: "pet_cat",
     label: "Cat owner",
     leakCategory: "pet_food_cat",
-    askQuestion: "Ghar mein billi paali hai kya? 🐈",
   },
   elderly_member: {
     key: "elderly_member",
     label: "Elderly member in household",
     leakCategory: "elderly_care",
-    askQuestion: "Ghar mein koi senior citizen bhi rehte hain?",
   },
   fitness_routine: {
     key: "fitness_routine",
     label: "Active fitness routine",
     leakCategory: "sports_nutrition",
-    askQuestion: "Gym ya fitness routine chal raha hai? 💪",
   },
   frequent_hosting: {
     key: "frequent_hosting",
     label: "Frequently hosts guests",
     leakCategory: "party_hosting_supplies",
-    askQuestion: "Ghar pe often mehmaan aate rehte hain?",
   },
   new_home: {
     key: "new_home",
     label: "Recently moved homes",
     leakCategory: "new_home_essentials",
-    askQuestion: "Naye ghar mein shift hue ho kya recently? 🏠",
   },
   vegetarian_household: {
     key: "vegetarian_household",
     label: "Vegetarian household",
     leakCategory: "plant_protein",
-    askQuestion: "Poori tarah vegetarian household hai?",
   },
   large_household: {
     key: "large_household",
     label: "Large household (5+ members)",
     leakCategory: "bulk_staples",
-    askQuestion: "Ghar mein 5 ya usse zyada log rehte hain?",
   },
 };
 

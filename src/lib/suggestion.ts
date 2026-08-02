@@ -5,19 +5,17 @@ import { LEAK_CATEGORY_SKUS } from "@/data/seed";
 
 export interface SuggestionChoice {
   attribute: AttributeKey;
-  tier: "ASSERT" | "ASK";
   leakCategory: LeakCategoryKey;
   evidence: string;
   justification: string;
-  question?: string;
-  productId?: string;
-  productName?: string;
-  productPrice?: number;
-  productMrp?: number;
-  productPackSize?: string;
-  productEmoji?: string;
-  productColorFrom?: string;
-  productColorTo?: string;
+  productId: string;
+  productName: string;
+  productPrice: number;
+  productMrp: number;
+  productPackSize: string;
+  productEmoji: string;
+  productColorFrom: string;
+  productColorTo: string;
 }
 
 /** Picks one product to represent a leak category — at random among the
@@ -67,7 +65,7 @@ export async function chooseSuggestion(
   const sessionPersona = await db.sessionPersona.findUniqueOrThrow({ where: { id: sessionPersonaId } });
   const [attrs, suppressed] = await Promise.all([
     db.graphAttribute.findMany({
-      where: { sessionPersonaId, tier: { in: ["ASSERT", "ASK"] } },
+      where: { sessionPersonaId, tier: "ASSERT" },
       orderBy: { confidence: "desc" },
     }),
     suppressedCategories(sessionPersonaId, sessionPersona.simDay),
@@ -82,24 +80,11 @@ export async function chooseSuggestion(
     const def = ATTRIBUTES[attr.attribute as AttributeKey];
     if (!def) continue;
 
-    if (attr.tier === "ASK") {
-      return {
-        attribute: def.key,
-        tier: "ASK",
-        leakCategory,
-        evidence: attr.evidence,
-        justification: attr.justification,
-        question: def.askQuestion,
-      };
-    }
-
-    // ASSERT — resolve a recommended product for this leak.
     const product = await pickLeakProduct(sessionPersonaId, leakCategory);
     if (!product) continue;
 
     return {
       attribute: def.key,
-      tier: "ASSERT",
       leakCategory,
       evidence: attr.evidence,
       justification: attr.justification,
@@ -129,7 +114,7 @@ export async function ensureCartSuggestionShownLogged(
   await db.suggestionEvent.create({
     data: {
       sessionPersonaId,
-      type: choice.tier === "ASSERT" ? "SHOWN_ASSERT" : "SHOWN_ASK",
+      type: "SHOWN_ASSERT",
       attribute: choice.attribute,
       category: choice.leakCategory,
       productId: choice.productId,
@@ -176,42 +161,6 @@ export async function respondNotNow(sessionPersonaId: string, leakCategory: Leak
     data: { sessionPersonaId, type: "TAPPED_NOT_NOW", category: leakCategory, surface: "CART" },
   });
   await bumpSuppression(sessionPersonaId, leakCategory, sessionPersona.simDay);
-}
-
-/**
- * Records the user's answer to an ASK-tier question, on the cart page
- * before checkout. On "yes", also upgrades the household graph to ASSERT
- * and resolves + returns the recommended product immediately, so the cart
- * can add it to the same order-in-progress instead of waiting for the next
- * order's inference pass.
- */
-export async function respondAskAnswer(sessionPersonaId: string, attribute: AttributeKey, answeredYes: boolean) {
-  const def = ATTRIBUTES[attribute];
-  const existing = await db.graphAttribute.findUnique({
-    where: { sessionPersonaId_attribute: { sessionPersonaId, attribute } },
-  });
-  await db.graphAttribute.update({
-    where: { sessionPersonaId_attribute: { sessionPersonaId, attribute } },
-    data: {
-      answeredYes,
-      tier: answeredYes ? "ASSERT" : "SILENCE",
-      confidence: answeredYes ? Math.max(existing?.confidence ?? 0, 0.9) : existing?.confidence ?? 0,
-      leakCategory: answeredYes ? def.leakCategory : null,
-    },
-  });
-  await db.suggestionEvent.create({
-    data: {
-      sessionPersonaId,
-      type: answeredYes ? "ASK_ANSWERED_YES" : "ASK_ANSWERED_NO",
-      attribute,
-      category: def.leakCategory,
-      surface: "CART",
-    },
-  });
-
-  if (!answeredYes) return null;
-
-  return pickLeakProduct(sessionPersonaId, def.leakCategory);
 }
 
 /** Instrumentation: detect a household organically repeat-purchasing a

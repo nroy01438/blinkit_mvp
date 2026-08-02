@@ -22,7 +22,7 @@ time to act on it.
 - `src/app/internal/*` — the instrumentation dashboard, deliberately outside the shop
   layout group so it never inherits consumer chrome
 - `src/lib/graph/*` — the Groq call, prompt, and Zod-validated response schema
-- `src/lib/attributes.ts` — the 10 household attributes, their leak category, and ASK copy
+- `src/lib/attributes.ts` — the 10 household attributes and their leak category
 - `src/lib/leakLedger.ts` — the auditable ₹ leak-value lookup (real catalog price × a
   documented monthly-frequency constant, never a model-generated number)
 - `src/lib/suggestion.ts` — guardrails: hard cap of one suggestion/order, category-already-
