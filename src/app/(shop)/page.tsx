@@ -2,9 +2,11 @@ import { db } from "@/lib/db";
 import { getOrCreateSessionPersona } from "@/lib/session";
 import { toCardData } from "@/lib/mapProduct";
 import { CategoryStrip } from "@/components/CategoryStrip";
-import { PromoBanner } from "@/components/PromoBanner";
+import { HeroBanner } from "@/components/HeroBanner";
+import { PromoCardsRow } from "@/components/PromoCardsRow";
+import { QuickPicksStrip, type QuickPickItem } from "@/components/QuickPicksStrip";
 import { ProductRail } from "@/components/ProductRail";
-import { slugForCategoryName } from "@/lib/categories";
+import { CATEGORIES, slugForCategoryName } from "@/lib/categories";
 
 const SECTIONS: { title: string; categories: string[] }[] = [
   { title: "Grocery & Kitchen", categories: ["Fruits & Vegetables", "Dairy, Bread & Eggs"] },
@@ -16,7 +18,7 @@ const SECTIONS: { title: string; categories: string[] }[] = [
 export default async function Home() {
   const sp = await getOrCreateSessionPersona();
 
-  const [buyAgainItems, sectionProducts] = await Promise.all([
+  const [buyAgainItems, sectionProducts, quickPickProducts] = await Promise.all([
     db.orderItem.groupBy({
       by: ["productId"],
       where: { order: { sessionPersonaId: sp.id } },
@@ -29,7 +31,15 @@ export default async function Home() {
         db.product.findMany({ where: { category: { in: s.categories } }, take: 12 })
       )
     ),
+    // One representative item per top-level category, for the trending
+    // thumbnail strip under the hero — variety across the catalog rather
+    // than 10 items from whichever category happens to sort first.
+    Promise.all(CATEGORIES.map((c) => db.product.findFirst({ where: { category: c.name }, orderBy: { name: "asc" } }))),
   ]);
+
+  const quickPicks: QuickPickItem[] = quickPickProducts
+    .filter((p): p is NonNullable<typeof p> => p !== null)
+    .map((p) => ({ id: p.id, name: p.name, category: p.category, emoji: p.emoji, colorFrom: p.colorFrom, colorTo: p.colorTo }));
 
   const buyAgainProductIds = buyAgainItems.map((i) => i.productId);
   const buyAgainProducts = buyAgainProductIds.length
@@ -41,8 +51,10 @@ export default async function Home() {
 
   return (
     <div className="pb-4">
+      <HeroBanner />
+      <PromoCardsRow />
+      <QuickPicksStrip items={quickPicks} />
       <CategoryStrip />
-      <PromoBanner />
       <ProductRail title="Buy it again" products={buyAgainOrdered.map(toCardData)} />
       {SECTIONS.map((s, idx) => (
         <ProductRail
