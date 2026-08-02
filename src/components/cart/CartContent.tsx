@@ -78,9 +78,14 @@ export async function CartContent() {
                 <BillRow label="Grand total" value={totals.grandTotal} bold />
               </div>
             </div>
+          </div>
 
-            {suggestion &&
-              (suggestion.tier === "ASSERT" && suggestion.productId ? (
+          {/* Sits outside the scrollable area, directly above the final CTA,
+              so the nudge is the last thing seen before paying — never
+              buried by scroll, never missable. */}
+          {suggestion && (
+            <div className="px-4 pt-3 pb-1 border-t border-divider shrink-0">
+              {suggestion.tier === "ASSERT" && suggestion.productId ? (
                 <AurKuchCard
                   tier="ASSERT"
                   attribute={suggestion.attribute}
@@ -105,8 +110,9 @@ export async function CartContent() {
                   justification={suggestion.justification}
                   question={suggestion.question}
                 />
-              ))}
-          </div>
+              )}
+            </div>
+          )}
 
           <CartCheckoutBar grandTotalWithoutTip={totals.grandTotal} />
         </>
