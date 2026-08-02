@@ -5,6 +5,17 @@ import { ProductCard } from "@/components/ProductCard";
 
 const RECENT_SEARCHES = ["milk", "atta", "chips", "cerelac", "detergent", "juice"];
 
+/** Lowercases, strips apostrophes so "Lay's" reads as "lays", and turns any
+ * other punctuation/hyphen into a word boundary so "Coca-Cola" reads as two
+ * separate words — matching how people actually type a product name. */
+function normalizeText(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
 export default async function SearchPage({
   searchParams,
 }: {
@@ -12,20 +23,25 @@ export default async function SearchPage({
 }) {
   const { q } = await searchParams;
   const query = (q ?? "").trim();
+  const queryWords = normalizeText(query).split(" ").filter(Boolean);
 
-  const products = query
-    ? await db.product.findMany({
-        where: {
-          OR: [
-            { name: { contains: query, mode: "insensitive" } },
-            { brand: { contains: query, mode: "insensitive" } },
-            { category: { contains: query, mode: "insensitive" } },
-            { subcategory: { contains: query, mode: "insensitive" } },
-          ],
-        },
-        take: 60,
-      })
-    : [];
+  // A real query is almost always more than one word ("coca cola", "amul
+  // milk", "lays chips") — matching the whole query as one literal
+  // substring against a single field misses nearly all of them, since
+  // catalog names rarely contain the query verbatim. Instead every query
+  // word must appear _somewhere_ across the product's name/brand/category/
+  // subcategory, each independently. The catalog is small (~384 SKUs), so
+  // filtering in code beats fighting Postgres's LIKE semantics over
+  // punctuation/hyphens for a result set this size.
+  const products =
+    queryWords.length > 0
+      ? (await db.product.findMany())
+          .filter((p) => {
+            const haystack = normalizeText(`${p.name} ${p.brand} ${p.category} ${p.subcategory}`);
+            return queryWords.every((w) => haystack.includes(w));
+          })
+          .slice(0, 60)
+      : [];
 
   return (
     <div className="max-w-[1280px] mx-auto px-3 md:px-6 py-4">
