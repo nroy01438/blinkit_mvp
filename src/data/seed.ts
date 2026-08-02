@@ -495,16 +495,20 @@ export const PERSONA_TEMPLATES: PersonaTemplate[] = [
     name: "Priya Sharma",
     age: 29,
     city: "Gurgaon",
-    // Three interleaved signals, deliberately strong and repeated: infant
+    // Five interleaved signals, deliberately strong and repeated: infant
     // (Cerelac/diaper-adjacent buys, ~6 orders), a recurring eggs+banana+
-    // Greek-yogurt fitness pattern (~5 orders), and a recurring bulk-drinks
-    // +snacks hosting pattern (~4 orders). None of these touch the literal
-    // leak subcategory itself (diapers, sports nutrition, party
-    // disposables, plant protein) — the fitness pattern deliberately avoids
-    // "Noodles & Pasta"-shelved items (oats, peanut butter) so it doesn't
-    // accidentally self-defeat the vegetarian_household / large_household
-    // leaks the way an earlier version of this data did.
+    // Greek-yogurt fitness pattern (~5 orders), a recurring bulk-drinks
+    // +snacks hosting pattern (~4 orders), a toddler-transition pattern
+    // (Stage 2/3 baby food, ~3 orders — Baby Food is its own subcategory,
+    // separate from "Toddler Snacks"), and a large-household pattern (two
+    // deliberately oversized multi-item grocery runs). None of these touch
+    // the literal leak subcategory itself (diapers, sports nutrition, party
+    // disposables, plant protein, Noodles & Pasta) — an earlier version of
+    // this data accidentally did, via oats/peanut butter, which silently
+    // self-defeated vegetarian_household and large_household regardless of
+    // confidence.
     orders: [
+      { daysAgo: 74, items: [{ sku: "DAIRY-AMUL-TAAZA-1L", qty: 3 }, { sku: "DAIRY-EGGS-FARM-12PC", qty: 2 }, { sku: "FV-ONION-1KG", qty: 2 }, { sku: "FV-POTATO-1KG", qty: 2 }, { sku: "DAIRY-BRITANNIA-BROWNBREAD-400G", qty: 2 }] },
       { daysAgo: 70, items: [{ sku: "BABY-CERELAC-WHEAT-STAGE1-300G", qty: 1 }, { sku: "DAIRY-AMUL-TAAZA-500ML", qty: 2 }, { sku: "DAIRY-BRITANNIA-BROWNBREAD-400G", qty: 1 }, { sku: "DAIRY-EGGS-FARM-6PC", qty: 1 }, { sku: "FV-BANANA-6PC", qty: 1 }] },
       { daysAgo: 66, items: [{ sku: "DAIRY-EGGS-FARM-6PC", qty: 1 }, { sku: "FV-BANANA-6PC", qty: 2 }, { sku: "DAIRY-EPIGAMIA-GREEKYOGURT-MANGO-90G", qty: 2 }] },
       { daysAgo: 63, items: [{ sku: "DRINK-COCACOLA-750ML", qty: 4 }, { sku: "SNACK-LAYS-CLASSICSALTED-52G", qty: 3 }, { sku: "SNACK-KURKURE-MASALAMUNCH-90G", qty: 2 }] },
@@ -522,8 +526,9 @@ export const PERSONA_TEMPLATES: PersonaTemplate[] = [
       { daysAgo: 19, items: [{ sku: "BABY-CERELAC-MULTIGRAIN-STAGE2-300G", qty: 1 }, { sku: "DAIRY-AMUL-TAAZA-500ML", qty: 2 }, { sku: "FV-PAPAYA-1PC", qty: 1 }] },
       { daysAgo: 15, items: [{ sku: "DRINK-THUMSUP-CAN-300ML", qty: 6 }, { sku: "SNACK-LAYS-CLASSICSALTED-52G", qty: 3 }, { sku: "SNACK-KURKURE-MASALAMUNCH-90G", qty: 2 }] },
       { daysAgo: 12, items: [{ sku: "HH-ARIEL-MATIC-SENSITIVE-1L", qty: 1 }, { sku: "DAIRY-AMUL-TAAZA-500ML", qty: 2 }, { sku: "SNACK-LAYS-MAGICMASALA-52G", qty: 1 }] },
+      { daysAgo: 10, items: [{ sku: "DAIRY-AMUL-TAAZA-1L", qty: 2 }, { sku: "DAIRY-EGGS-FARM-12PC", qty: 1 }, { sku: "FV-TOMATO-500G", qty: 2 }, { sku: "FV-ONION-1KG", qty: 2 }, { sku: "DAIRY-BRITANNIA-BROWNBREAD-400G", qty: 2 }] },
       { daysAgo: 9, items: [{ sku: "DAIRY-EGGS-FARM-6PC", qty: 1 }, { sku: "FV-BANANA-6PC", qty: 2 }, { sku: "DAIRY-EPIGAMIA-GREEKYOGURT-MANGO-90G", qty: 1 }] },
-      { daysAgo: 5, items: [{ sku: "BABY-CERELAC-WHEAT-STAGE1-300G", qty: 1 }, { sku: "DAIRY-AMUL-TAAZA-500ML", qty: 2 }, { sku: "DAIRY-EGGS-FARM-6PC", qty: 1 }, { sku: "FV-BANANA-6PC", qty: 1 }] },
+      { daysAgo: 5, items: [{ sku: "BABY-CERELAC-FRUITVEG-STAGE2-300G", qty: 1 }, { sku: "DAIRY-AMUL-TAAZA-500ML", qty: 2 }, { sku: "DAIRY-EGGS-FARM-6PC", qty: 1 }, { sku: "FV-BANANA-6PC", qty: 1 }] },
     ],
   },
   {
@@ -531,15 +536,28 @@ export const PERSONA_TEMPLATES: PersonaTemplate[] = [
     name: "Rohit Kumar",
     age: 34,
     city: "Bengaluru",
+    // Dog food (Pedigree) is already purchased here on Blinkit, so pet_dog
+    // is a real "leak already captured" case — high confidence but SILENCE
+    // by design, nothing left to suggest. Two open signals engineered on
+    // top: a gym/protein pattern (eggs+banana+yogurt, never touching the
+    // "Sports Nutrition" category itself) and a strengthened bulk-drinks
+    // hosting pattern.
     orders: [
+      { daysAgo: 92, items: [{ sku: "DAIRY-EGGS-FARM-6PC", qty: 1 }, { sku: "FV-BANANA-6PC", qty: 2 }, { sku: "DAIRY-EPIGAMIA-GREEKYOGURT-PLAIN-400G", qty: 1 }] },
       { daysAgo: 88, items: [{ sku: "DRINK-COCACOLA-750ML", qty: 2 }, { sku: "SNACK-LAYS-CLASSICSALTED-52G", qty: 2 }, { sku: "FV-ONION-1KG", qty: 1 }] },
+      { daysAgo: 83, items: [{ sku: "DRINK-COCACOLA-CAN-300ML", qty: 6 }, { sku: "SNACK-BIKAJI-BHUJIA-200G", qty: 2 }, { sku: "SNACK-KURKURE-MASALAMUNCH-90G", qty: 2 }] },
       { daysAgo: 79, items: [{ sku: "SNACK-BRITANNIA-GOODDAY-CASHEW-200G", qty: 1 }, { sku: "HH-HARPIC-TOILETCLEANER-500ML", qty: 1 }, { sku: "FV-BANANA-6PC", qty: 1 }] },
+      { daysAgo: 74, items: [{ sku: "DAIRY-EGGS-FARM-6PC", qty: 1 }, { sku: "FV-BANANA-6PC", qty: 2 }] },
       { daysAgo: 70, items: [{ sku: "PET-PEDIGREE-ADULT-3KG", qty: 1 }, { sku: "DAIRY-AMUL-TAAZA-1L", qty: 1 }, { sku: "SNACK-PARLE-G-200G", qty: 1 }] },
+      { daysAgo: 65, items: [{ sku: "DRINK-THUMSUP-CAN-300ML", qty: 6 }, { sku: "SNACK-HALDIRAM-NAVRATANMIX-200G", qty: 2 }] },
       { daysAgo: 61, items: [{ sku: "HH-SURFEXCEL-EASYWASH-1KG", qty: 1 }, { sku: "DRINK-COCACOLA-750ML", qty: 1 }, { sku: "SNACK-MAGGI-MASALA-70G", qty: 4 }] },
+      { daysAgo: 56, items: [{ sku: "DAIRY-EGGS-FARM-6PC", qty: 1 }, { sku: "FV-BANANA-6PC", qty: 1 }, { sku: "DAIRY-EPIGAMIA-GREEKYOGURT-MANGO-90G", qty: 2 }] },
       { daysAgo: 52, items: [{ sku: "DRINK-BISLERI-1L", qty: 2 }, { sku: "SNACK-KURKURE-MASALAMUNCH-90G", qty: 2 }, { sku: "FV-TOMATO-500G", qty: 1 }] },
       { daysAgo: 43, items: [{ sku: "HH-VIM-LIQUIDGEL-500ML", qty: 1 }, { sku: "SNACK-CADBURY-DAIRYMILK-40G", qty: 3 }, { sku: "FV-BANANA-6PC", qty: 1 }] },
       { daysAgo: 34, items: [{ sku: "PET-PEDIGREE-DENTASTIX-SMALL-7PC", qty: 1 }, { sku: "DRINK-SPRITE-750ML", qty: 1 }, { sku: "SNACK-BRITANNIA-MARIEGOLD-200G", qty: 1 }] },
+      { daysAgo: 28, items: [{ sku: "DRINK-COCACOLA-CAN-300ML", qty: 6 }, { sku: "SNACK-BIKAJI-BHUJIA-200G", qty: 2 }, { sku: "SNACK-LAYS-CLASSICSALTED-52G", qty: 2 }] },
       { daysAgo: 25, items: [{ sku: "DAIRY-AMUL-BUTTER-100G", qty: 1 }, { sku: "DAIRY-BRITANNIA-BROWNBREAD-400G", qty: 1 }, { sku: "DAIRY-EGGS-FARM-6PC", qty: 1 }] },
+      { daysAgo: 20, items: [{ sku: "DAIRY-EGGS-FARM-6PC", qty: 1 }, { sku: "FV-BANANA-6PC", qty: 2 }, { sku: "DAIRY-EPIGAMIA-GREEKYOGURT-PLAIN-400G", qty: 1 }] },
       { daysAgo: 16, items: [{ sku: "DRINK-THUMSUP-750ML", qty: 2 }, { sku: "SNACK-HALDIRAM-ALOOBHUJIA-200G", qty: 1 }, { sku: "FV-POTATO-1KG", qty: 1 }] },
       { daysAgo: 7, items: [{ sku: "PC-COLGATE-STRONGTEETH-100G", qty: 1 }, { sku: "PC-HEADSHOULDERS-SHAMPOO-180ML", qty: 1 }, { sku: "SNACK-LAYS-MAGICMASALA-52G", qty: 2 }] },
     ],
@@ -549,12 +567,23 @@ export const PERSONA_TEMPLATES: PersonaTemplate[] = [
     name: "Ananya Iyer",
     age: 26,
     city: "Mumbai",
+    // Her existing oats+peanut-butter fitness pattern already sits in
+    // "Noodles & Pasta" (a pre-existing, unrelated quirk of this catalog's
+    // categorization — left as-is since it's her strongest signal and
+    // touching it risks weakening it), which does mean vegetarian_household
+    // / large_household stay closed for her. Two clean new signals added
+    // instead: cat ownership (accessories only, never actual cat food) and
+    // a hosting pattern.
     orders: [
       { daysAgo: 69, items: [{ sku: "SNACK-QUAKER-OATS-1KG", qty: 1 }, { sku: "DAIRY-EGGS-FARM-6PC", qty: 1 }, { sku: "SNACK-PINTOLA-PEANUTBUTTER-340G", qty: 1 }, { sku: "FV-BANANA-6PC", qty: 2 }] },
+      { daysAgo: 64, items: [{ sku: "PET-CATLITTERBOX", qty: 1 }, { sku: "PET-BOWL-STEEL", qty: 1 }] },
       { daysAgo: 62, items: [{ sku: "DAIRY-EGGS-FARM-6PC", qty: 1 }, { sku: "FV-BANANA-6PC", qty: 1 }, { sku: "DAIRY-AMUL-CURD-400G", qty: 1 }] },
+      { daysAgo: 58, items: [{ sku: "DRINK-COCACOLA-CAN-300ML", qty: 6 }, { sku: "SNACK-BIKAJI-BHUJIA-200G", qty: 2 }, { sku: "SNACK-HALDIRAM-NAVRATANMIX-200G", qty: 2 }] },
       { daysAgo: 55, items: [{ sku: "SNACK-QUAKER-OATS-1KG", qty: 1 }, { sku: "DAIRY-EGGS-FARM-6PC", qty: 1 }, { sku: "FV-BANANA-6PC", qty: 2 }, { sku: "DAIRY-BRITANNIA-BROWNBREAD-400G", qty: 1 }] },
       { daysAgo: 48, items: [{ sku: "SNACK-PINTOLA-PEANUTBUTTER-340G", qty: 1 }, { sku: "FV-BANANA-6PC", qty: 2 }, { sku: "SNACK-LAYS-CLASSICSALTED-52G", qty: 1 }] },
+      { daysAgo: 44, items: [{ sku: "PET-SCRATCHINGPOST", qty: 1 }, { sku: "PET-GROOMINGBRUSH", qty: 1 }] },
       { daysAgo: 41, items: [{ sku: "SNACK-QUAKER-OATS-1KG", qty: 1 }, { sku: "DAIRY-EGGS-FARM-6PC", qty: 1 }, { sku: "SNACK-PINTOLA-PEANUTBUTTER-340G", qty: 1 }, { sku: "FV-BANANA-6PC", qty: 1 }] },
+      { daysAgo: 36, items: [{ sku: "DRINK-THUMSUP-CAN-300ML", qty: 6 }, { sku: "SNACK-KURKURE-MASALAMUNCH-90G", qty: 2 }, { sku: "SNACK-LAYS-CLASSICSALTED-52G", qty: 2 }] },
       { daysAgo: 34, items: [{ sku: "DAIRY-EGGS-FARM-6PC", qty: 1 }, { sku: "FV-BANANA-6PC", qty: 2 }, { sku: "DAIRY-EPIGAMIA-GREEKYOGURT-MANGO-90G", qty: 2 }] },
       { daysAgo: 27, items: [{ sku: "SNACK-QUAKER-OATS-1KG", qty: 1 }, { sku: "DAIRY-EGGS-FARM-6PC", qty: 1 }, { sku: "FV-BANANA-6PC", qty: 1 }, { sku: "FV-PALAK-250G", qty: 1 }] },
       { daysAgo: 20, items: [{ sku: "SNACK-PINTOLA-PEANUTBUTTER-340G", qty: 1 }, { sku: "DAIRY-EGGS-FARM-6PC", qty: 1 }, { sku: "FV-BANANA-6PC", qty: 2 }] },
@@ -568,15 +597,28 @@ export const PERSONA_TEMPLATES: PersonaTemplate[] = [
     name: "Vikram Malhotra",
     age: 41,
     city: "Delhi",
+    // The original "AI should mostly stay quiet" control case — and two of
+    // his existing habits (Harpic, garbage bags) already self-silence
+    // new_home_essentials and party_hosting_supplies via the
+    // already-purchased guardrail, a real "leak already captured" story.
+    // Two clean new signals layered on top: a dog (accessories only, never
+    // actual dog food) and a large-household pattern (bulk quantities
+    // across ordinary categories, never touching "Noodles & Pasta").
     orders: [
       { daysAgo: 87, items: [{ sku: "FV-ONION-1KG", qty: 1 }, { sku: "FV-POTATO-1KG", qty: 1 }, { sku: "DAIRY-AMUL-TAAZA-500ML", qty: 1 }, { sku: "DAIRY-BRITANNIA-BROWNBREAD-400G", qty: 1 }] },
+      { daysAgo: 82, items: [{ sku: "PET-TRIXIE-COLLAR", qty: 1 }, { sku: "PET-KONG-CHEWTOY", qty: 1 }] },
       { daysAgo: 78, items: [{ sku: "DRINK-COCACOLA-750ML", qty: 1 }, { sku: "SNACK-LAYS-CLASSICSALTED-52G", qty: 1 }, { sku: "PC-COLGATE-STRONGTEETH-100G", qty: 1 }] },
+      { daysAgo: 73, items: [{ sku: "DAIRY-AMUL-TAAZA-1L", qty: 3 }, { sku: "DAIRY-EGGS-FARM-12PC", qty: 2 }, { sku: "FV-ONION-1KG", qty: 3 }, { sku: "FV-POTATO-1KG", qty: 3 }, { sku: "DAIRY-BRITANNIA-BROWNBREAD-400G", qty: 2 }] },
       { daysAgo: 69, items: [{ sku: "HH-SURFEXCEL-EASYWASH-1KG", qty: 1 }, { sku: "HH-VIM-LIQUIDGEL-500ML", qty: 1 }, { sku: "HH-HARPIC-TOILETCLEANER-500ML", qty: 1 }] },
       { daysAgo: 60, items: [{ sku: "DAIRY-EGGS-FARM-6PC", qty: 1 }, { sku: "DAIRY-AMUL-BUTTER-100G", qty: 1 }, { sku: "FV-BANANA-6PC", qty: 1 }, { sku: "FV-APPLE-SHIMLA-4PC", qty: 1 }] },
+      { daysAgo: 55, items: [{ sku: "PET-TRIXIE-LEASH", qty: 1 }, { sku: "PET-POOPBAGS-60", qty: 1 }] },
       { daysAgo: 51, items: [{ sku: "SNACK-CADBURY-DAIRYMILK-40G", qty: 1 }, { sku: "SNACK-BRITANNIA-GOODDAY-CASHEW-200G", qty: 1 }, { sku: "DRINK-BISLERI-1L", qty: 1 }] },
+      { daysAgo: 46, items: [{ sku: "DAIRY-AMUL-TAAZA-1L", qty: 2 }, { sku: "FV-TOMATO-500G", qty: 3 }, { sku: "FV-ONION-1KG", qty: 2 }, { sku: "DAIRY-EGGS-FARM-12PC", qty: 1 }, { sku: "SNACK-LAYS-CLASSICSALTED-52G", qty: 4 }] },
       { daysAgo: 42, items: [{ sku: "HOME-CLASSMATE-NOTEBOOK-172PG", qty: 1 }, { sku: "HOME-CELLO-BALLPEN-5PC", qty: 1 }, { sku: "HOME-GARBAGEBAGS-MEDIUM-30PC", qty: 1 }] },
       { daysAgo: 33, items: [{ sku: "PC-HEADSHOULDERS-SHAMPOO-180ML", qty: 1 }, { sku: "PC-DOVE-BAR-100G", qty: 1 }, { sku: "PC-DETTOL-SOAP-125G", qty: 1 }] },
+      { daysAgo: 28, items: [{ sku: "PET-BOWL-STEEL", qty: 1 }, { sku: "PET-GROOMINGBRUSH", qty: 1 }] },
       { daysAgo: 24, items: [{ sku: "FV-TOMATO-500G", qty: 1 }, { sku: "FV-CAULIFLOWER-1PC", qty: 1 }, { sku: "FV-GINGER-200G", qty: 1 }, { sku: "DRINK-REAL-MIXEDFRUIT-1L", qty: 1 }] },
+      { daysAgo: 18, items: [{ sku: "DAIRY-AMUL-TAAZA-1L", qty: 3 }, { sku: "DAIRY-BRITANNIA-BROWNBREAD-400G", qty: 2 }, { sku: "FV-BANANA-6PC", qty: 2 }, { sku: "DAIRY-EGGS-FARM-12PC", qty: 1 }] },
       { daysAgo: 15, items: [{ sku: "SNACK-HALDIRAM-ALOOBHUJIA-200G", qty: 1 }, { sku: "DRINK-SPRITE-750ML", qty: 1 }, { sku: "HH-ODONIL-CAKE-75G", qty: 1 }] },
       { daysAgo: 6, items: [{ sku: "DAIRY-AMUL-CHEESESLICES-200G", qty: 1 }, { sku: "SNACK-BRITANNIA-MARIEGOLD-200G", qty: 1 }, { sku: "DRINK-THUMSUP-750ML", qty: 1 }, { sku: "HOME-TEALIGHT-12PC", qty: 1 }] },
     ],
