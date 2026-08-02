@@ -51,30 +51,41 @@ async function suppressedCategories(sessionPersonaId: string, simDay: number): P
   return set;
 }
 
-/**
- * Chooses the single best-eligible suggestion for this household right now,
- * or null if none qualifies (VIKRAM's silence path). Enforces: leak category
- * not already purchased (handled upstream in engine.ts), not already in the
- * excludeCategories set (e.g. current cart contents), and not under active
- * 30-day suppression from two prior declines.
- */
-export async function chooseSuggestion(
-  sessionPersonaId: string,
-  excludeLeakCategories: Set<LeakCategoryKey> = new Set()
-): Promise<SuggestionChoice | null> {
-  const sessionPersona = await db.sessionPersona.findUniqueOrThrow({ where: { id: sessionPersonaId } });
-  const [attrs, suppressed] = await Promise.all([
-    db.graphAttribute.findMany({
-      where: { sessionPersonaId, tier: "ASSERT" },
-      orderBy: { confidence: "desc" },
-    }),
-    suppressedCategories(sessionPersonaId, sessionPersona.simDay),
-  ]);
+/** Generic, non-graph-specific copy for the last-resort fallback passes
+ * below — used when the graph doesn't (yet) have a confident, unsuppressed
+ * read, so the card can't honestly claim a specific household insight. */
+const GENERIC_FALLBACK_JUSTIFICATION = "Kaafi log ek saath yeh bhi le lete hain — try karein? 🙂";
 
+/** Priority order for a household with no graph signal at all yet (a
+ * guest's very first-ever cart, before any order has been placed to infer
+ * from) — broadly-applicable categories first, narrow/specific ones
+ * (pets, infant, elderly) last since guessing those blind is a stretch. */
+const GENERIC_FALLBACK_ATTRIBUTE_ORDER: AttributeKey[] = [
+  "new_home",
+  "large_household",
+  "vegetarian_household",
+  "frequent_hosting",
+  "fitness_routine",
+  "pet_dog",
+  "pet_cat",
+  "elderly_member",
+  "toddler_present",
+  "infant_present",
+];
+
+type GraphAttributeRow = Awaited<ReturnType<typeof db.graphAttribute.findMany>>[number];
+
+async function firstEligible(
+  sessionPersonaId: string,
+  attrs: GraphAttributeRow[],
+  excludeLeakCategories: Set<LeakCategoryKey>,
+  suppressed: Set<string>,
+  ignoreSuppression: boolean
+) {
   for (const attr of attrs) {
     if (!attr.leakCategory) continue;
     const leakCategory = attr.leakCategory as LeakCategoryKey;
-    if (suppressed.has(leakCategory)) continue;
+    if (!ignoreSuppression && suppressed.has(leakCategory)) continue;
     if (excludeLeakCategories.has(leakCategory)) continue;
 
     const def = ATTRIBUTES[attr.attribute as AttributeKey];
@@ -83,11 +94,80 @@ export async function chooseSuggestion(
     const product = await pickLeakProduct(sessionPersonaId, leakCategory);
     if (!product) continue;
 
+    return { attr, def, leakCategory, product };
+  }
+  return null;
+}
+
+/**
+ * Chooses the single best-eligible suggestion for this household right now.
+ * A demo where checkout can complete with no "Aur kuch?" nudge at all reads
+ * as broken, so this always returns a product for a non-empty cart via a
+ * tiered fallback, each pass more permissive than the last:
+ *
+ *   1. A confident (ASSERT) read, not suppressed, not already in the cart —
+ *      the normal, fully-personalized path.
+ *   2. Same confident reads, but ignoring an active 30-day suppression —
+ *      covers the edge case where every confident signal this household has
+ *      happens to be cooling down from two prior declines.
+ *   3. Any graph read at all (even below the ASSERT bar), ignoring
+ *      suppression — the household's best circumstantial signal, framed
+ *      with generic copy instead of an overconfident claim.
+ *   4. No graph signal exists yet at all (a guest's very first-ever cart,
+ *      before any order has been placed to infer from) — a fixed,
+ *      broadly-safe starter suggestion instead of nothing.
+ *
+ * Only returns null if every leak category collides with what's already in
+ * the cart (handled upstream in engine.ts for already-purchased history) —
+ * i.e. there is genuinely nothing left to suggest.
+ */
+export async function chooseSuggestion(
+  sessionPersonaId: string,
+  excludeLeakCategories: Set<LeakCategoryKey> = new Set()
+): Promise<SuggestionChoice | null> {
+  const sessionPersona = await db.sessionPersona.findUniqueOrThrow({ where: { id: sessionPersonaId } });
+  const [allAttrs, suppressed] = await Promise.all([
+    db.graphAttribute.findMany({ where: { sessionPersonaId }, orderBy: { confidence: "desc" } }),
+    suppressedCategories(sessionPersonaId, sessionPersona.simDay),
+  ]);
+  const assertAttrs = allAttrs.filter((a) => a.tier === "ASSERT");
+
+  const hit =
+    (await firstEligible(sessionPersonaId, assertAttrs, excludeLeakCategories, suppressed, false)) ??
+    (await firstEligible(sessionPersonaId, assertAttrs, excludeLeakCategories, suppressed, true)) ??
+    (await firstEligible(sessionPersonaId, allAttrs, excludeLeakCategories, suppressed, true));
+
+  if (hit) {
+    return {
+      attribute: hit.def.key,
+      leakCategory: hit.leakCategory,
+      evidence: hit.attr.evidence,
+      justification: hit.attr.tier === "ASSERT" ? hit.attr.justification : GENERIC_FALLBACK_JUSTIFICATION,
+      productId: hit.product.id,
+      productName: hit.product.name,
+      productPrice: hit.product.price,
+      productMrp: hit.product.mrp,
+      productPackSize: hit.product.packSize,
+      productEmoji: hit.product.emoji,
+      productColorFrom: hit.product.colorFrom,
+      productColorTo: hit.product.colorTo,
+    };
+  }
+
+  // Pass 4: no graph rows exist at all yet (guest, pre-first-order).
+  for (const key of GENERIC_FALLBACK_ATTRIBUTE_ORDER) {
+    const def = ATTRIBUTES[key];
+    const leakCategory = def.leakCategory;
+    if (excludeLeakCategories.has(leakCategory)) continue;
+
+    const product = await pickLeakProduct(sessionPersonaId, leakCategory);
+    if (!product) continue;
+
     return {
       attribute: def.key,
       leakCategory,
-      evidence: attr.evidence,
-      justification: attr.justification,
+      evidence: "First order — no purchase history yet to personalize from.",
+      justification: GENERIC_FALLBACK_JUSTIFICATION,
       productId: product.id,
       productName: product.name,
       productPrice: product.price,
