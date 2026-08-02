@@ -113,6 +113,17 @@ async function provisionPersonaFully(sessionId: string, personaKey: PersonaKey) 
   return created;
 }
 
+/** Guest has no seed history, so its graph should only ever reflect real
+ * orders it has actually placed — never a guess manufactured from "(no
+ * orders yet)". Self-healing: if an older build left behind attribute rows
+ * for a guest that still has zero real orders, wipe them so the dashboard
+ * shows the honest blank state instead of stale pre-order guesses. */
+async function cleanupStaleGuestGraph(sessionPersonaId: string) {
+  const realOrders = await db.order.count({ where: { sessionPersonaId, isSeedHistory: false } });
+  if (realOrders > 0) return;
+  await db.graphAttribute.deleteMany({ where: { sessionPersonaId } });
+}
+
 /** Best-effort, self-healing warm-up: on every request, check which of the
  * four named demo personas this session is still missing and provision
  * them in the background. Once all four exist it's a single cheap no-op
@@ -154,19 +165,25 @@ export const getOrCreateSessionPersona = cache(async function getOrCreateSession
     where: { sessionId_personaKey: { sessionId, personaKey } },
   });
   if (existing) {
+    if (personaKey === "guest") after(() => cleanupStaleGuestGraph(existing.id));
     scheduleOtherPersonaWarmup(sessionId, personaKey);
     return existing;
   }
 
   const created = await createAndSeedPersona(sessionId, personaKey);
 
-  after(async () => {
-    try {
-      await recomputeGraph(created.id);
-    } catch (err) {
-      console.error("background graph warm-up failed", err);
-    }
-  });
+  // Guest has no seed history to reason about yet — only run inference once
+  // it has real orders (placeOrder() already triggers recomputeGraph after
+  // every order). Every other persona gets the usual background warm-up.
+  if (personaKey !== "guest") {
+    after(async () => {
+      try {
+        await recomputeGraph(created.id);
+      } catch (err) {
+        console.error("background graph warm-up failed", err);
+      }
+    });
+  }
   scheduleOtherPersonaWarmup(sessionId, personaKey);
 
   return created;

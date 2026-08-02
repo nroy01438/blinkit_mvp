@@ -187,13 +187,13 @@ export default async function InternalDashboard({
             label={`Revenue at risk / month — ${activeName}`}
             value={`₹${activeLeakTotal}/mo`}
             accent="emerald"
-            sub="Estimated spend this household is likely making elsewhere, on categories the AI is confident about."
+            sub="What Blinkit could capture if it acted on every confident guess below. It's a snapshot, not a ticker — it moves when a guess is added/removed, or drops to ₹0 for a category the moment the household actually buys it here (the leak just got captured)."
           />
           <StatCard
             label="Revenue at risk / month — all test shoppers combined"
             value={`₹${aggregateLeakTotal}/mo`}
             accent="amber"
-            sub="Same estimate, summed across every persona tried in this browser session."
+            sub="Same estimate, summed across every persona tried in this browser session — the pitch to an investor: this many households, this much monthly revenue currently leaking elsewhere."
           />
           <StatCard
             label="Missed moments"

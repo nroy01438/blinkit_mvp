@@ -406,17 +406,69 @@ export const PRODUCTS: SeedProduct[] = [
 
 // Exactly one representative SKU per key — must exist in PRODUCTS, must have trialPack: true,
 // must be the smallest/cheapest pack in its subcategory (this is the item the AI feature will recommend).
-export const LEAK_CATEGORY_SKUS: Record<string, string> = {
-  baby_diapers_wipes: "BABY-PAMPERS-PANTS-M-TRIAL-10PC",
-  toddler_snacks: "BABY-LITTLES-VEGGIEPUFFS-TRIAL-40G",
-  pet_food_dog: "PET-PEDIGREE-PUPPY-TRIAL-80G",
-  pet_food_cat: "PET-WHISKAS-POUCH-TRIAL-85G",
-  elderly_care: "PC-CERTAIN-ADULTDIAPER-TRIAL-2PC",
-  sports_nutrition: "SPORT-MUSCLEBLAZE-WHEY-TRIAL-30G",
-  party_hosting_supplies: "HOME-PAPERPLATES-TRIAL-10PC",
-  new_home_essentials: "HH-NEWHOME-STARTERCOMBOKIT-MINI",
-  bulk_staples: "SNACK-AASHIRVAAD-ATTA-5KG",
-  plant_protein: "SNACK-NUTRELA-SOYACHUNKS-200G",
+// Multiple candidate products per leak category — so the same inferred fact
+// (e.g. "infant in household") doesn't always surface the exact same SKU.
+// chooseSuggestion() picks one at random, preferring ones this household
+// hasn't already bought. First entry is the "representative" SKU used for
+// the ₹/mo leak-value estimate, so that number stays stable regardless of
+// which variant ends up suggested.
+export const LEAK_CATEGORY_SKUS: Record<string, string[]> = {
+  baby_diapers_wipes: [
+    "BABY-PAMPERS-PANTS-M-TRIAL-10PC",
+    "BABY-HUGGIES-WIPES-72PC",
+    "BABY-JOHNSONS-POWDER-200G",
+    "BABY-HIMALAYA-SOAP-75G",
+    "BABY-JOHNSONS-OIL-200ML",
+  ],
+  toddler_snacks: [
+    "BABY-LITTLES-VEGGIEPUFFS-TRIAL-40G",
+    "BABY-HAPPA-RAGIPUFFS-100G",
+    "BABY-YUMITOS-RICEPUFFS-40G",
+    "BABY-FARMLEY-FRUITBITES-100G",
+  ],
+  pet_food_dog: [
+    "PET-PEDIGREE-PUPPY-TRIAL-80G",
+    "PET-DROOLS-PUPPY-1.2KG",
+    "PET-PEDIGREE-DENTASTIX-SMALL-7PC",
+    "PET-KONG-CHEWTOY",
+  ],
+  pet_food_cat: [
+    "PET-WHISKAS-POUCH-TRIAL-85G",
+    "PET-MEO-KITTEN-1.1KG",
+    "PET-WHISKAS-TREATS-60G",
+    "PET-SHEBA-SALMON-85G",
+  ],
+  elderly_care: [
+    "PC-CERTAIN-ADULTDIAPER-TRIAL-2PC",
+    "PC-DABUR-CHYAWANPRASH-500G",
+    "PC-ACCUCHEK-STRIPS-25S",
+    "PC-HIMALAYA-BPVATI-60TAB",
+  ],
+  sports_nutrition: [
+    "SPORT-MUSCLEBLAZE-WHEY-TRIAL-30G",
+    "SPORT-YOGABAR-ENERGYBAR-30G",
+    "SPORT-RITEBITE-CHOCOALMOND-50G",
+    "SPORT-ALPINO-PROTEINBAR-55G",
+  ],
+  party_hosting_supplies: [
+    "HOME-PAPERPLATES-TRIAL-10PC",
+    "HOME-PLASTICCUPS-20PC",
+    "HOME-BALLOONS-50PC",
+    "HOME-TEALIGHT-12PC",
+  ],
+  new_home_essentials: [
+    "HH-NEWHOME-STARTERCOMBOKIT-MINI",
+    "HH-GODREJAER-SPRAY-220ML",
+    "HH-SCOTCHBRITE-SCRUBPAD-5PC",
+    "HOME-GARBAGEBAGS-MEDIUM-30PC",
+  ],
+  bulk_staples: [
+    "SNACK-AASHIRVAAD-ATTA-5KG",
+    "SNACK-FORTUNE-BASMATI-5KG",
+    "SNACK-TATA-TOORDAL-1KG",
+    "SNACK-FORTUNE-SUNLITE-OIL-1L",
+  ],
+  plant_protein: ["SNACK-NUTRELA-SOYACHUNKS-200G", "SNACK-NUTRELA-SOYACHUNKS-500G"],
 };
 
 export interface PersonaOrderItem {

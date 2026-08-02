@@ -10,8 +10,8 @@ import { PERSONA_TEMPLATES } from "@/data/seed";
 export type Tier = "ASSERT" | "ASK" | "SILENCE";
 
 export function tierForConfidence(confidence: number): Tier {
-  if (confidence >= 0.75) return "ASSERT";
-  if (confidence >= 0.45) return "ASK";
+  if (confidence >= 0.65) return "ASSERT";
+  if (confidence >= 0.35) return "ASK";
   return "SILENCE";
 }
 

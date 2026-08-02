@@ -23,7 +23,7 @@ export const LEAK_MONTHLY_FREQUENCY: Record<LeakCategoryKey, number> = {
 const priceCache = new Map<string, number>();
 
 export async function leakRepresentativePrice(leakCategory: LeakCategoryKey): Promise<number> {
-  const sku = LEAK_CATEGORY_SKUS[leakCategory];
+  const sku = LEAK_CATEGORY_SKUS[leakCategory][0];
   if (priceCache.has(sku)) return priceCache.get(sku)!;
   const product = await db.product.findUnique({ where: { sku } });
   const price = product?.price ?? 0;

@@ -20,6 +20,28 @@ export interface SuggestionChoice {
   productColorTo?: string;
 }
 
+/** Picks one product to represent a leak category — at random among the
+ * category's candidates, preferring ones this household hasn't already
+ * bought, so the same inferred fact doesn't always surface the identical
+ * SKU (e.g. infant_present can resolve to diapers, wipes, baby soap, baby
+ * oil...). Falls back to any available candidate if they've somehow bought
+ * every option already. */
+async function pickLeakProduct(sessionPersonaId: string, leakCategory: LeakCategoryKey) {
+  const skus = LEAK_CATEGORY_SKUS[leakCategory] ?? [];
+  if (skus.length === 0) return null;
+
+  const [candidates, purchasedItems] = await Promise.all([
+    db.product.findMany({ where: { sku: { in: skus }, available: true } }),
+    db.orderItem.findMany({ where: { order: { sessionPersonaId } }, select: { productId: true } }),
+  ]);
+  if (candidates.length === 0) return null;
+
+  const purchasedIds = new Set(purchasedItems.map((i) => i.productId));
+  const fresh = candidates.filter((p) => !purchasedIds.has(p.id));
+  const pool = fresh.length > 0 ? fresh : candidates;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 async function suppressedCategories(sessionPersonaId: string, simDay: number): Promise<Set<string>> {
   const rows = await db.categorySuppression.findMany({ where: { sessionPersonaId } });
   const set = new Set<string>();
@@ -71,10 +93,9 @@ export async function chooseSuggestion(
       };
     }
 
-    // ASSERT — resolve the recommended (trial-pack) product for this leak.
-    const sku = LEAK_CATEGORY_SKUS[leakCategory];
-    const product = sku ? await db.product.findUnique({ where: { sku } }) : null;
-    if (!product || !product.available) continue;
+    // ASSERT — resolve a recommended product for this leak.
+    const product = await pickLeakProduct(sessionPersonaId, leakCategory);
+    if (!product) continue;
 
     return {
       attribute: def.key,
@@ -190,9 +211,7 @@ export async function respondAskAnswer(sessionPersonaId: string, attribute: Attr
 
   if (!answeredYes) return null;
 
-  const sku = LEAK_CATEGORY_SKUS[def.leakCategory];
-  const product = sku ? await db.product.findUnique({ where: { sku } }) : null;
-  return product && product.available ? product : null;
+  return pickLeakProduct(sessionPersonaId, def.leakCategory);
 }
 
 /** Instrumentation: detect a household organically repeat-purchasing a
