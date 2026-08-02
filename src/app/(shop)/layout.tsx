@@ -11,15 +11,21 @@ import { DemoPanel } from "@/components/demo/DemoPanel";
 import { ShellSkeleton } from "@/components/ShellSkeleton";
 import { computeTotals } from "@/lib/pricing";
 
-export default function ShopLayout({ children }: { children: React.ReactNode }) {
+export default function ShopLayout({
+  children,
+  modal,
+}: {
+  children: React.ReactNode;
+  modal: React.ReactNode;
+}) {
   return (
     <Suspense fallback={<ShellSkeleton />}>
-      <SessionShell>{children}</SessionShell>
+      <SessionShell modal={modal}>{children}</SessionShell>
     </Suspense>
   );
 }
 
-async function SessionShell({ children }: { children: React.ReactNode }) {
+async function SessionShell({ children, modal }: { children: React.ReactNode; modal: React.ReactNode }) {
   const sp = await getOrCreateSessionPersona();
   const template = PERSONA_TEMPLATES.find((t) => t.key === sp.personaKey);
   const cartItems = await db.cartItem.findMany({ where: { sessionPersonaId: sp.id }, include: { product: true } });
@@ -36,6 +42,7 @@ async function SessionShell({ children }: { children: React.ReactNode }) {
       <Footer />
       <BottomCartBar />
       <DemoPanel currentPersona={sp.personaKey} simDay={sp.simDay} />
+      {modal}
     </CartProvider>
   );
 }
