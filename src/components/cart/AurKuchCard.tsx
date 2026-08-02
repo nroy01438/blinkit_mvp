@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { addSuggestedItem, declineSuggestion, answerAsk } from "@/app/actions/orders";
+import { addSuggestedToCartAction, declineCartSuggestionAction, answerCartAskAction } from "@/app/actions/cartSuggestion";
+import { useCart } from "@/components/CartContext";
 import type { AttributeKey, LeakCategoryKey } from "@/lib/attributes";
 
 export interface AurKuchProduct {
@@ -17,7 +18,6 @@ export interface AurKuchProduct {
 }
 
 interface Props {
-  orderId: string;
   tier: "ASSERT" | "ASK";
   attribute: AttributeKey;
   leakCategory: LeakCategoryKey;
@@ -28,11 +28,15 @@ interface Props {
 
 type LocalState = "idle" | "added" | "declined" | "answered";
 
-export function AurKuchCard({ orderId, tier, attribute, leakCategory, justification, question, product }: Props) {
+/** The one moment "Aur kuch?" gets to make its case — on the cart page,
+ * before "Proceed to Pay", while the customer can still act on it. Adding
+ * merges the suggestion straight into the cart they're about to check out. */
+export function AurKuchCard({ tier, attribute, leakCategory, justification, question, product }: Props) {
   const [state, setState] = useState<LocalState>("idle");
   const [confirmedProduct, setConfirmedProduct] = useState<AurKuchProduct | null>(null);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
+  const { getQty, updateQty } = useCart();
 
   if (state === "added") {
     return (
@@ -92,7 +96,8 @@ export function AurKuchCard({ orderId, tier, attribute, leakCategory, justificat
             disabled={pending}
             onClick={() =>
               startTransition(async () => {
-                await addSuggestedItem(orderId, effectiveProduct.id);
+                await addSuggestedToCartAction(effectiveProduct.id, attribute);
+                updateQty(effectiveProduct.id, getQty(effectiveProduct.id) + 1, effectiveProduct.price);
                 setState("added");
                 router.refresh();
               })
@@ -105,8 +110,9 @@ export function AurKuchCard({ orderId, tier, attribute, leakCategory, justificat
             disabled={pending}
             onClick={() =>
               startTransition(async () => {
-                await declineSuggestion(orderId, leakCategory);
+                await declineCartSuggestionAction(leakCategory);
                 setState("declined");
+                router.refresh();
               })
             }
             className="text-[12.5px] text-text-muted font-semibold px-3 py-2"
@@ -126,7 +132,7 @@ export function AurKuchCard({ orderId, tier, attribute, leakCategory, justificat
           disabled={pending}
           onClick={() =>
             startTransition(async () => {
-              const resolved = await answerAsk(attribute, true, orderId);
+              const resolved = await answerCartAskAction(attribute, true);
               if (resolved) {
                 setConfirmedProduct({
                   id: resolved.id,
@@ -152,7 +158,7 @@ export function AurKuchCard({ orderId, tier, attribute, leakCategory, justificat
           disabled={pending}
           onClick={() =>
             startTransition(async () => {
-              await answerAsk(attribute, false, orderId);
+              await answerCartAskAction(attribute, false);
               setState("answered");
             })
           }
@@ -167,7 +173,7 @@ export function AurKuchCard({ orderId, tier, attribute, leakCategory, justificat
 
 function SuggestionShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-surface border border-divider rounded-xl p-3.5 animate-fade-slide relative overflow-hidden">
+    <div className="bg-surface border border-divider rounded-xl p-3.5 mb-3 animate-fade-slide relative overflow-hidden">
       <div className="absolute left-0 top-0 bottom-0 w-1 bg-action-green" />
       <p className="text-[12.5px] font-extrabold text-text-primary mb-2 pl-1">Aur kuch? 👀</p>
       <div className="pl-1">{children}</div>

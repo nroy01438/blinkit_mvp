@@ -4,7 +4,8 @@ import { getOrCreateSessionPersona } from "@/lib/session";
 import { computeTotals } from "@/lib/pricing";
 import { CartItemRow } from "@/components/cart/CartItemRow";
 import { CartCheckoutBar } from "@/components/cart/CartCheckoutBar";
-import { previewCartSuggestion, leakCategoryOf } from "@/lib/suggestion";
+import { AurKuchCard } from "@/components/cart/AurKuchCard";
+import { chooseSuggestion, ensureCartSuggestionShownLogged, leakCategoryOf } from "@/lib/suggestion";
 import type { LeakCategoryKey } from "@/lib/attributes";
 
 export default async function CartPage() {
@@ -20,7 +21,14 @@ export default async function CartPage() {
   const cartLeakCategories = new Set(
     cartItems.map((i) => leakCategoryOf(i.product.category, i.product.subcategory)).filter((c): c is LeakCategoryKey => c !== null)
   );
-  const suggestion = cartItems.length > 0 ? await previewCartSuggestion(sp.id, cartLeakCategories) : null;
+  // One suggestion opportunity per checkout: once the customer has acted on
+  // it (added / not now / answered), stay quiet for the rest of this cart,
+  // even if a different attribute would otherwise also qualify.
+  const suggestion =
+    cartItems.length > 0 && !sp.cartSuggestionSpent ? await chooseSuggestion(sp.id, cartLeakCategories) : null;
+  if (suggestion) {
+    await ensureCartSuggestionShownLogged(sp.id, sp.cartSuggestionShown, suggestion);
+  }
 
   return (
     <div className="md:bg-black/10 md:min-h-[calc(100vh-72px)]">
@@ -54,6 +62,7 @@ export default async function CartPage() {
                     emoji: i.product.emoji,
                     colorFrom: i.product.colorFrom,
                     colorTo: i.product.colorTo,
+                    isAddOn: i.isAddOn,
                   }}
                 />
               ))}
@@ -68,11 +77,33 @@ export default async function CartPage() {
                 </div>
               </div>
 
-              {suggestion && (
-                <div className="text-[11.5px] text-text-secondary bg-green-tint/50 border border-green-tint rounded-md px-3 py-2 mb-3 leading-snug">
-                  👀 {suggestion.justification}
-                </div>
-              )}
+              {suggestion &&
+                (suggestion.tier === "ASSERT" && suggestion.productId ? (
+                  <AurKuchCard
+                    tier="ASSERT"
+                    attribute={suggestion.attribute}
+                    leakCategory={suggestion.leakCategory}
+                    justification={suggestion.justification}
+                    product={{
+                      id: suggestion.productId,
+                      name: suggestion.productName!,
+                      price: suggestion.productPrice!,
+                      mrp: suggestion.productMrp!,
+                      packSize: suggestion.productPackSize!,
+                      emoji: suggestion.productEmoji!,
+                      colorFrom: suggestion.productColorFrom!,
+                      colorTo: suggestion.productColorTo!,
+                    }}
+                  />
+                ) : (
+                  <AurKuchCard
+                    tier="ASK"
+                    attribute={suggestion.attribute}
+                    leakCategory={suggestion.leakCategory}
+                    justification={suggestion.justification}
+                    question={suggestion.question}
+                  />
+                ))}
             </div>
 
             <CartCheckoutBar grandTotalWithoutTip={totals.grandTotal} />

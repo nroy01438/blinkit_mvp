@@ -11,6 +11,7 @@ export interface CartRowData {
   emoji: string;
   colorFrom: string;
   colorTo: string;
+  isAddOn?: boolean;
 }
 
 export function CartItemRow({ product }: { product: CartRowData }) {
@@ -26,7 +27,10 @@ export function CartItemRow({ product }: { product: CartRowData }) {
         {product.emoji}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-[13px] text-text-primary line-clamp-2 leading-tight">{product.name}</p>
+        <p className="text-[13px] text-text-primary line-clamp-2 leading-tight">
+          {product.name}
+          {product.isAddOn && <span className="text-action-green font-semibold"> · aur kuch</span>}
+        </p>
         <p className="text-[11px] text-text-muted mt-0.5">{product.packSize}</p>
         <div className="flex items-center gap-1.5 mt-0.5">
           <span className="text-[12px] font-bold text-text-primary">₹{product.price}</span>

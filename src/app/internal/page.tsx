@@ -109,10 +109,11 @@ export default async function InternalDashboard({
             revenue that quietly &quot;leaks&quot; to other apps, order after order.
           </p>
           <p className="text-[12.5px] text-slate-300 leading-relaxed mb-2">
-            <span className="font-bold text-white">The fix — &quot;Aur Kuch?&quot; (&quot;anything else?&quot;):</span> after every
-            order, an LLM reads that household&apos;s <em>entire</em> real order history and infers unstated facts about them — a
-            baby in the house, a dog, a gym habit, an elderly parent — then, at most, makes <em>one</em> relevant nudge on the
-            next order&apos;s tracking screen. Never more than once per order, and never for something they already buy here.
+            <span className="font-bold text-white">The fix — &quot;Aur Kuch?&quot; (&quot;anything else?&quot;):</span> an LLM reads
+            a household&apos;s <em>entire</em> real order history and infers unstated facts about them — a baby in the house, a
+            dog, a gym habit, an elderly parent — then, at most, makes <em>one</em> relevant nudge on the cart page, before
+            checkout, while there&apos;s still time to act on it. Never more than once per checkout, and never for something
+            they already buy here.
           </p>
           <p className="text-[12.5px] text-slate-300 leading-relaxed mb-3">
             <span className="font-bold text-white">This page</span> is the AI&apos;s working — every guess it made, how confident
@@ -126,7 +127,7 @@ export default async function InternalDashboard({
             See it live as Priya →
           </Link>
           <span className="text-[11px] text-slate-500 ml-2">
-            place any order, then watch the tracking screen during &quot;Packing your order.&quot;
+            add anything to cart, then look above the &quot;Proceed to Pay&quot; button.
           </span>
         </section>
 

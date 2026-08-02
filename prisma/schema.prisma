@@ -54,6 +54,13 @@ model SessionPersona {
   simDay     Int      @default(0)
   createdAt  DateTime @default(now())
 
+  // Cart-stage "Aur Kuch?" state — the suggestion now lives on the cart
+  // page (before payment) instead of the order-tracking page (after it).
+  // Both reset to false once the cart is checked out (see placeOrder),
+  // starting a fresh one-suggestion-per-checkout budget for the next cart.
+  cartSuggestionShown Boolean @default(false) // "shown" funnel event already logged this cart cycle
+  cartSuggestionSpent Boolean @default(false) // user already added/declined/answered this cart cycle — budget spent
+
   orders       Order[]
   cartItems    CartItem[]
   attributes   GraphAttribute[]
@@ -84,7 +91,7 @@ model Order {
   tip         Int @default(0)
   grandTotal  Int
 
-  suggestionSurfaceShown String? // TRACKING | CART — hard cap: at most one per order
+  suggestionSurfaceShown String? // CART — set from the cart-stage add-on, if any; hard cap: at most one per order
   suggestionAttribute    String?
   suggestionTier          String? // ASSERT | ASK | SILENCE
 
@@ -115,6 +122,8 @@ model CartItem {
   productId        String
   product          Product        @relation(fields: [productId], references: [id])
   qty              Int
+  isAddOn          Boolean        @default(false) // added via the cart-stage "Aur kuch?" suggestion
+  addOnAttribute   String? // which household-graph attribute it came from, e.g. infant_present
 
   @@unique([sessionPersonaId, productId])
 }

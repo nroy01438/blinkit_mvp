@@ -1,9 +1,10 @@
 # Aur Kuch? — a Blinkit clone with an AI household-graph feature
 
 A pixel-faithful clone of the Blinkit web storefront with one AI feature embedded in it:
-during "Being packed" on the order-tracking screen, the app infers unstated household
-facts (infant in the house, a dog, an active fitness routine, ...) from a persona's real
-order history via an LLM, and surfaces at most one contextual suggestion per order.
+on the cart page, before checkout, the app infers unstated household facts (infant in
+the house, a dog, an active fitness routine, ...) from a persona's real order history via
+an LLM, and surfaces at most one contextual suggestion per checkout — while there's still
+time to act on it.
 
 ## Stack
 

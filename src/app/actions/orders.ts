@@ -5,16 +5,8 @@ import { db } from "@/lib/db";
 import { getOrCreateSessionPersona } from "@/lib/session";
 import { computeTotals } from "@/lib/pricing";
 import { recomputeGraph } from "@/lib/graph/engine";
-import {
-  chooseSuggestion,
-  recordSuggestionShown,
-  respondNotNow,
-  respondAskAnswer,
-  logRepeatsWithoutSuggestion,
-  leakCategoryOf,
-} from "@/lib/suggestion";
+import { logRepeatsWithoutSuggestion, leakCategoryOf } from "@/lib/suggestion";
 import type { LeakCategoryKey } from "@/lib/attributes";
-import type { AttributeKey } from "@/lib/attributes";
 
 export async function placeOrder(tip: number): Promise<string> {
   const sp = await getOrCreateSessionPersona();
@@ -27,6 +19,11 @@ export async function placeOrder(tip: number): Promise<string> {
   const totals = computeTotals(cartItems.map((i) => ({ price: i.product.price, qty: i.qty })));
   const grandTotal = totals.grandTotal + tip;
 
+  // Any "Aur kuch?" add-on was already decided on the cart page, before
+  // payment — carry it onto the order for the record (tracking-page "·
+  // aur kuch" tag, the post-delivery rating follow-up, and instrumentation).
+  const addOnItem = cartItems.find((i) => i.isAddOn);
+
   const order = await db.order.create({
     data: {
       sessionPersonaId: sp.id,
@@ -37,11 +34,15 @@ export async function placeOrder(tip: number): Promise<string> {
       handlingFee: totals.handlingFee,
       tip,
       grandTotal,
+      suggestionSurfaceShown: addOnItem ? "CART" : undefined,
+      suggestionAttribute: addOnItem?.addOnAttribute ?? undefined,
+      suggestionTier: addOnItem ? "ASSERT" : undefined,
       items: {
         create: cartItems.map((i) => ({
           productId: i.productId,
           qty: i.qty,
           priceAtPurchase: i.product.price,
+          isAddOn: i.isAddOn,
         })),
       },
     },
@@ -52,77 +53,27 @@ export async function placeOrder(tip: number): Promise<string> {
       .map((i) => leakCategoryOf(i.product.category, i.product.subcategory))
       .filter((c): c is LeakCategoryKey => c !== null)
   );
+  const addOnLeakCategory = addOnItem ? leakCategoryOf(addOnItem.product.category, addOnItem.product.subcategory) : null;
 
   await db.cartItem.deleteMany({ where: { sessionPersonaId: sp.id } });
+  // Fresh one-suggestion-per-checkout budget for the next cart.
+  await db.sessionPersona.update({
+    where: { id: sp.id },
+    data: { cartSuggestionShown: false, cartSuggestionSpent: false },
+  });
 
-  // Recompute the household graph after every order (brief requirement).
-  // Graceful AI failure: on error, keep the previous graph and simply skip
-  // choosing a fresh suggestion for this order.
+  // Recompute the household graph after every order (brief requirement) so
+  // the NEXT cart view reflects this order's contents. Graceful AI failure:
+  // on error, keep the previous graph.
   try {
     await recomputeGraph(sp.id);
-    const choice = await chooseSuggestion(sp.id);
-    if (choice) {
-      await recordSuggestionShown(order.id, sp.id, choice, "TRACKING");
-    }
-    await logRepeatsWithoutSuggestion(sp.id, order.id, purchasedLeaks, choice?.leakCategory ?? null);
+    await logRepeatsWithoutSuggestion(sp.id, order.id, purchasedLeaks, addOnLeakCategory);
   } catch (err) {
-    console.error("post-order suggestion pipeline failed", err);
+    console.error("post-order graph recompute failed", err);
   }
 
   revalidatePath("/", "layout");
   return order.id;
-}
-
-export async function addSuggestedItem(orderId: string, productId: string) {
-  const sp = await getOrCreateSessionPersona();
-  const [order, product] = await Promise.all([
-    db.order.findUniqueOrThrow({ where: { id: orderId } }),
-    db.product.findUniqueOrThrow({ where: { id: productId } }),
-  ]);
-
-  await db.orderItem.create({
-    data: { orderId, productId, qty: 1, priceAtPurchase: product.price, isAddOn: true },
-  });
-  const newItemTotal = order.itemTotal + product.price;
-  await db.order.update({
-    where: { id: orderId },
-    data: { itemTotal: newItemTotal, grandTotal: newItemTotal + order.deliveryFee + order.handlingFee + order.tip },
-  });
-
-  let leakCategory: string | undefined;
-  if (order.suggestionAttribute) {
-    const attr = await db.graphAttribute.findUnique({
-      where: { sessionPersonaId_attribute: { sessionPersonaId: sp.id, attribute: order.suggestionAttribute } },
-    });
-    leakCategory = attr?.leakCategory ?? undefined;
-  }
-
-  await db.suggestionEvent.create({
-    data: {
-      sessionPersonaId: sp.id,
-      orderId,
-      type: "TAPPED_ADD",
-      attribute: order.suggestionAttribute ?? undefined,
-      category: leakCategory,
-      productId,
-      surface: "TRACKING",
-    },
-  });
-
-  revalidatePath(`/orders/${orderId}`);
-}
-
-export async function declineSuggestion(orderId: string, leakCategory: LeakCategoryKey) {
-  const sp = await getOrCreateSessionPersona();
-  await respondNotNow(orderId, sp.id, leakCategory);
-  revalidatePath(`/orders/${orderId}`);
-}
-
-export async function answerAsk(attribute: AttributeKey, answeredYes: boolean, orderId: string) {
-  const sp = await getOrCreateSessionPersona();
-  const product = await respondAskAnswer(orderId, sp.id, attribute, answeredYes);
-  revalidatePath(`/orders/${orderId}`);
-  return product;
 }
 
 export async function submitRating(orderId: string, stars: number, answer: string | null) {

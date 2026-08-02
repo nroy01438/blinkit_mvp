@@ -443,16 +443,27 @@ export const PERSONA_TEMPLATES: PersonaTemplate[] = [
     name: "Priya Sharma",
     age: 29,
     city: "Gurgaon",
+    // Three interleaved signals on purpose: infant (Cerelac/diaper-adjacent
+    // buys), a recurring oats+eggs+banana+peanut-butter fitness pattern, and
+    // a recurring bulk-drinks+snacks hosting pattern — none of which touch
+    // the literal leak subcategory itself (diapers, sports nutrition, party
+    // disposables), so all three stay open, ASSERT-able leaks at once
+    // instead of the graph having only one story to tell.
     orders: [
       { daysAgo: 68, items: [{ sku: "BABY-CERELAC-WHEAT-STAGE1-300G", qty: 1 }, { sku: "DAIRY-AMUL-TAAZA-500ML", qty: 2 }, { sku: "DAIRY-BRITANNIA-BROWNBREAD-400G", qty: 1 }, { sku: "DAIRY-EGGS-FARM-6PC", qty: 1 }, { sku: "FV-BANANA-6PC", qty: 1 }] },
+      { daysAgo: 64, items: [{ sku: "SNACK-QUAKER-OATS-1KG", qty: 1 }, { sku: "DAIRY-EGGS-FARM-6PC", qty: 1 }, { sku: "FV-BANANA-6PC", qty: 2 }] },
       { daysAgo: 61, items: [{ sku: "DAIRY-AMUL-TAAZA-500ML", qty: 2 }, { sku: "FV-ONION-1KG", qty: 1 }, { sku: "FV-TOMATO-500G", qty: 1 }, { sku: "SNACK-LAYS-CLASSICSALTED-52G", qty: 2 }] },
+      { daysAgo: 57, items: [{ sku: "DRINK-COCACOLA-750ML", qty: 4 }, { sku: "SNACK-LAYS-CLASSICSALTED-52G", qty: 3 }, { sku: "SNACK-KURKURE-MASALAMUNCH-90G", qty: 2 }] },
       { daysAgo: 54, items: [{ sku: "BABY-CERELAC-WHEAT-STAGE1-300G", qty: 1 }, { sku: "DAIRY-AMUL-TAAZA-500ML", qty: 2 }, { sku: "SNACK-PARLE-G-200G", qty: 1 }, { sku: "FV-APPLE-SHIMLA-4PC", qty: 1 }] },
       { daysAgo: 47, items: [{ sku: "HH-ARIEL-MATIC-SENSITIVE-1L", qty: 1 }, { sku: "DAIRY-AMUL-TAAZA-500ML", qty: 2 }, { sku: "DAIRY-BRITANNIA-WHITEBREAD-400G", qty: 1 }] },
+      { daysAgo: 44, items: [{ sku: "SNACK-QUAKER-OATS-1KG", qty: 1 }, { sku: "DAIRY-EGGS-FARM-6PC", qty: 1 }, { sku: "FV-BANANA-6PC", qty: 1 }, { sku: "SNACK-PINTOLA-PEANUTBUTTER-340G", qty: 1 }] },
       { daysAgo: 40, items: [{ sku: "BABY-CERELAC-RICE-STAGE1-300G", qty: 1 }, { sku: "DAIRY-AMUL-TAAZA-500ML", qty: 2 }, { sku: "DAIRY-EGGS-FARM-6PC", qty: 1 }, { sku: "FV-BANANA-6PC", qty: 1 }] },
+      { daysAgo: 36, items: [{ sku: "DRINK-THUMSUP-750ML", qty: 4 }, { sku: "SNACK-HALDIRAM-ALOOBHUJIA-200G", qty: 2 }, { sku: "SNACK-BINGO-MADANGLES-72G", qty: 2 }] },
       { daysAgo: 33, items: [{ sku: "DAIRY-AMUL-TAAZA-500ML", qty: 2 }, { sku: "SNACK-CADBURY-DAIRYMILK-40G", qty: 2 }, { sku: "FV-MANGO-ALPHONSO-1KG", qty: 1 }] },
       { daysAgo: 26, items: [{ sku: "BABY-CERELAC-WHEAT-STAGE1-300G", qty: 1 }, { sku: "DAIRY-AMUL-TAAZA-500ML", qty: 2 }, { sku: "DAIRY-BRITANNIA-BROWNBREAD-400G", qty: 1 }, { sku: "DAIRY-EGGS-FARM-6PC", qty: 1 }] },
       { daysAgo: 19, items: [{ sku: "BABY-CERELAC-MULTIGRAIN-STAGE2-300G", qty: 1 }, { sku: "DAIRY-AMUL-TAAZA-500ML", qty: 2 }, { sku: "FV-PAPAYA-1PC", qty: 1 }] },
       { daysAgo: 12, items: [{ sku: "HH-ARIEL-MATIC-SENSITIVE-1L", qty: 1 }, { sku: "DAIRY-AMUL-TAAZA-500ML", qty: 2 }, { sku: "SNACK-LAYS-MAGICMASALA-52G", qty: 1 }] },
+      { daysAgo: 9, items: [{ sku: "SNACK-QUAKER-OATS-1KG", qty: 1 }, { sku: "DAIRY-EGGS-FARM-6PC", qty: 1 }, { sku: "FV-BANANA-6PC", qty: 2 }, { sku: "SNACK-PINTOLA-PEANUTBUTTER-340G", qty: 1 }] },
       { daysAgo: 5, items: [{ sku: "BABY-CERELAC-WHEAT-STAGE1-300G", qty: 1 }, { sku: "DAIRY-AMUL-TAAZA-500ML", qty: 2 }, { sku: "DAIRY-EGGS-FARM-6PC", qty: 1 }, { sku: "FV-BANANA-6PC", qty: 1 }] },
     ],
   },

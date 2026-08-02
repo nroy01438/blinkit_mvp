@@ -2,10 +2,8 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getOrCreateSessionPersona } from "@/lib/session";
 import { computeStatus, ensureDeliveredLogged, remainingSecondsInPhase, type OrderStatus } from "@/lib/orderStatus";
-import { getOrderSuggestionDisplay, orderHasSuggestionResponse } from "@/lib/suggestion";
 import { OrderStepper } from "@/components/tracking/OrderStepper";
 import { AutoRefresh } from "@/components/tracking/AutoRefresh";
-import { AurKuchCard } from "@/components/tracking/AurKuchCard";
 import { RatingForm } from "@/components/tracking/RatingForm";
 
 const STATUS_HEADLINE: Record<OrderStatus, string> = {
@@ -32,11 +30,6 @@ export default async function OrderTrackingPage({ params }: { params: Promise<{ 
   const status = computeStatus(order);
   await ensureDeliveredLogged(order.id);
 
-  const showSuggestionSurface = order.suggestionSurfaceShown === "TRACKING" && (status === "PACKING" || status === "OUT_FOR_DELIVERY");
-  const alreadyResponded = showSuggestionSurface ? await orderHasSuggestionResponse(order.id) : true;
-  const suggestion = showSuggestionSurface && !alreadyResponded ? await getOrderSuggestionDisplay(order, sp.id) : null;
-  const suggestionButAnswered = showSuggestionSurface && alreadyResponded ? await getOrderSuggestionDisplay(order, sp.id) : null;
-
   const addOnItem = order.items.find((i) => i.isAddOn);
   const showRating = status === "DELIVERED" && order.ratingStars === null && !order.isSeedHistory;
 
@@ -62,41 +55,10 @@ export default async function OrderTrackingPage({ params }: { params: Promise<{ 
         <OrderStepper status={status} />
       </div>
 
-      {suggestion && (
-        <div className="mb-4">
-          {suggestion.tier === "ASSERT" ? (
-            <AurKuchCard
-              orderId={order.id}
-              tier="ASSERT"
-              attribute={suggestion.attribute}
-              leakCategory={suggestion.leakCategory}
-              justification={suggestion.justification}
-              product={{
-                id: suggestion.product.id,
-                name: suggestion.product.name,
-                price: suggestion.product.price,
-                mrp: suggestion.product.mrp,
-                packSize: suggestion.product.packSize,
-                emoji: suggestion.product.emoji,
-                colorFrom: suggestion.product.colorFrom,
-                colorTo: suggestion.product.colorTo,
-              }}
-            />
-          ) : (
-            <AurKuchCard
-              orderId={order.id}
-              tier="ASK"
-              attribute={suggestion.attribute}
-              leakCategory={suggestion.leakCategory}
-              justification={suggestion.justification}
-              question={suggestion.question}
-            />
-          )}
+      {addOnItem && (
+        <div className="mb-4 text-center text-[11.5px] text-action-green font-semibold bg-green-tint/50 border border-green-tint rounded-md py-2">
+          🎉 Nice — {addOnItem.product.name} rode along with this order, thanks to Aur kuch?
         </div>
-      )}
-
-      {!suggestion && suggestionButAnswered && (
-        <div className="mb-4 text-center text-[11.5px] text-text-muted">Aur kuch suggestion already handled for this order ✓</div>
       )}
 
       <div className="bg-surface border border-divider rounded-xl p-4 mb-4">

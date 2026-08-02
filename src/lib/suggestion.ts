@@ -13,6 +13,11 @@ export interface SuggestionChoice {
   productId?: string;
   productName?: string;
   productPrice?: number;
+  productMrp?: number;
+  productPackSize?: string;
+  productEmoji?: string;
+  productColorFrom?: string;
+  productColorTo?: string;
 }
 
 async function suppressedCategories(sessionPersonaId: string, simDay: number): Promise<Set<string>> {
@@ -80,32 +85,37 @@ export async function chooseSuggestion(
       productId: product.id,
       productName: product.name,
       productPrice: product.price,
+      productMrp: product.mrp,
+      productPackSize: product.packSize,
+      productEmoji: product.emoji,
+      productColorFrom: product.colorFrom,
+      productColorTo: product.colorTo,
     };
   }
 
   return null;
 }
 
-export async function recordSuggestionShown(orderId: string, sessionPersonaId: string, choice: SuggestionChoice, surface: "TRACKING" | "CART") {
-  await db.order.update({
-    where: { id: orderId },
-    data: {
-      suggestionSurfaceShown: surface,
-      suggestionAttribute: choice.attribute,
-      suggestionTier: choice.tier,
-    },
-  });
+/** Logs the "shown" funnel event exactly once per cart-checkout cycle —
+ * guarded by SessionPersona.cartSuggestionShown, the same
+ * check-a-flag-then-write pattern `ensureDeliveredLogged` uses for orders. */
+export async function ensureCartSuggestionShownLogged(
+  sessionPersonaId: string,
+  alreadyShown: boolean,
+  choice: SuggestionChoice
+) {
+  if (alreadyShown) return;
   await db.suggestionEvent.create({
     data: {
       sessionPersonaId,
-      orderId,
       type: choice.tier === "ASSERT" ? "SHOWN_ASSERT" : "SHOWN_ASK",
       attribute: choice.attribute,
       category: choice.leakCategory,
       productId: choice.productId,
-      surface,
+      surface: "CART",
     },
   });
+  await db.sessionPersona.update({ where: { id: sessionPersonaId }, data: { cartSuggestionShown: true } });
 }
 
 async function bumpSuppression(sessionPersonaId: string, leakCategory: LeakCategoryKey, simDay: number) {
@@ -132,34 +142,29 @@ async function bumpSuppression(sessionPersonaId: string, leakCategory: LeakCateg
         sessionPersonaId,
         type: "SUPPRESSED",
         category: leakCategory,
-        surface: "TRACKING",
+        surface: "CART",
         metadata: { declineCount },
       },
     });
   }
 }
 
-export async function respondNotNow(orderId: string, sessionPersonaId: string, leakCategory: LeakCategoryKey) {
+export async function respondNotNow(sessionPersonaId: string, leakCategory: LeakCategoryKey) {
   const sessionPersona = await db.sessionPersona.findUniqueOrThrow({ where: { id: sessionPersonaId } });
   await db.suggestionEvent.create({
-    data: { sessionPersonaId, orderId, type: "TAPPED_NOT_NOW", category: leakCategory, surface: "TRACKING" },
+    data: { sessionPersonaId, type: "TAPPED_NOT_NOW", category: leakCategory, surface: "CART" },
   });
   await bumpSuppression(sessionPersonaId, leakCategory, sessionPersona.simDay);
 }
 
 /**
- * Records the user's answer to an ASK-tier question. On "yes", also
- * upgrades the household graph to ASSERT and resolves + returns the
- * recommended product immediately, so the tracking screen can swap the
- * question straight for a product card in the same order instead of
- * waiting for the next order's inference pass.
+ * Records the user's answer to an ASK-tier question, on the cart page
+ * before checkout. On "yes", also upgrades the household graph to ASSERT
+ * and resolves + returns the recommended product immediately, so the cart
+ * can add it to the same order-in-progress instead of waiting for the next
+ * order's inference pass.
  */
-export async function respondAskAnswer(
-  orderId: string,
-  sessionPersonaId: string,
-  attribute: AttributeKey,
-  answeredYes: boolean
-) {
+export async function respondAskAnswer(sessionPersonaId: string, attribute: AttributeKey, answeredYes: boolean) {
   const def = ATTRIBUTES[attribute];
   const existing = await db.graphAttribute.findUnique({
     where: { sessionPersonaId_attribute: { sessionPersonaId, attribute } },
@@ -176,17 +181,14 @@ export async function respondAskAnswer(
   await db.suggestionEvent.create({
     data: {
       sessionPersonaId,
-      orderId,
       type: answeredYes ? "ASK_ANSWERED_YES" : "ASK_ANSWERED_NO",
       attribute,
       category: def.leakCategory,
-      surface: "TRACKING",
+      surface: "CART",
     },
   });
 
   if (!answeredYes) return null;
-
-  await db.order.update({ where: { id: orderId }, data: { suggestionTier: "ASSERT" } });
 
   const sku = LEAK_CATEGORY_SKUS[def.leakCategory];
   const product = sku ? await db.product.findUnique({ where: { sku } }) : null;
@@ -194,7 +196,7 @@ export async function respondAskAnswer(
 }
 
 /** Instrumentation: detect a household organically repeat-purchasing a
- * known-leak category on an order where no suggestion was shown for it —
+ * known-leak category on an order where no suggestion was added for it —
  * the funnel step the brief calls out as the metric that matters most. */
 export async function logRepeatsWithoutSuggestion(
   sessionPersonaId: string,
@@ -216,75 +218,10 @@ export async function logRepeatsWithoutSuggestion(
         orderId,
         type: "REPEAT_WITHOUT_SUGGESTION",
         category: cat,
-        surface: "TRACKING",
+        surface: "CART",
       },
     });
   }
-}
-
-/** Reconstructs the full display payload for an order's already-chosen
- * suggestion (persisted at placeOrder time) so the tracking page can render
- * it without re-running inference. */
-export async function getOrderSuggestionDisplay(
-  order: { id: string; suggestionAttribute: string | null; suggestionTier: string | null },
-  sessionPersonaId: string
-) {
-  if (!order.suggestionAttribute || !order.suggestionTier || order.suggestionTier === "SILENCE") return null;
-  const def = ATTRIBUTES[order.suggestionAttribute as AttributeKey];
-  if (!def) return null;
-
-  const attrRow = await db.graphAttribute.findUnique({
-    where: { sessionPersonaId_attribute: { sessionPersonaId, attribute: order.suggestionAttribute } },
-  });
-  if (!attrRow || !attrRow.leakCategory) return null;
-  const leakCategory = attrRow.leakCategory as LeakCategoryKey;
-
-  const base = {
-    attribute: def.key,
-    leakCategory,
-    justification: attrRow.justification,
-    evidence: attrRow.evidence,
-  };
-
-  if (order.suggestionTier === "ASK") {
-    return { ...base, tier: "ASK" as const, question: def.askQuestion };
-  }
-
-  const sku = LEAK_CATEGORY_SKUS[leakCategory];
-  const product = sku ? await db.product.findUnique({ where: { sku } }) : null;
-  if (!product) return null;
-  return { ...base, tier: "ASSERT" as const, product };
-}
-
-/**
- * Whether this order's suggestion is fully resolved and should render as a
- * static "already handled" line instead of an interactive card. Answering
- * an ASK "yes" is deliberately excluded — it upgrades the order to ASSERT
- * (see respondAskAnswer) and the interaction continues into that product
- * card, so it must still render interactively until added or declined.
- */
-export async function orderHasSuggestionResponse(orderId: string): Promise<boolean> {
-  const count = await db.suggestionEvent.count({
-    where: {
-      orderId,
-      type: { in: ["TAPPED_ADD", "TAPPED_NOT_NOW", "ASK_ANSWERED_NO"] },
-    },
-  });
-  return count > 0;
-}
-
-/** Read-only cart-page preview: only ever surfaces high-confidence (ASSERT)
- * suggestions, as a quiet one-line aside. Never logs an event or consumes
- * the per-order hard cap — the interactive suggestion (with Add / Not now
- * and guardrail-affecting logging) lives exclusively on the tracking
- * screen once the order exists. */
-export async function previewCartSuggestion(
-  sessionPersonaId: string,
-  excludeLeakCategories: Set<LeakCategoryKey>
-): Promise<SuggestionChoice | null> {
-  const choice = await chooseSuggestion(sessionPersonaId, excludeLeakCategories);
-  if (choice?.tier === "ASSERT") return choice;
-  return null;
 }
 
 export function leakCategoryOf(productCategory: string, productSubcategory: string): LeakCategoryKey | null {
